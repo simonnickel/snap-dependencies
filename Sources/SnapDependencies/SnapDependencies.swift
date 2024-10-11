@@ -1,2 +1,4 @@
-// The Swift Programming Language
-// https://docs.swift.org/swift-book
+//
+//  SNAP - https://github.com/simonnickel/snap
+//  Created by Simon Nickel
+//
