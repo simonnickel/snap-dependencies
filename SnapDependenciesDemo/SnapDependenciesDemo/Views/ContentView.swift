@@ -4,19 +4,21 @@
 //
 
 import SwiftUI
+import SnapDependencies
 
 struct ContentView: View {
-    var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
-        }
-        .padding()
-    }
+
+	var body: some View {
+		VStack {
+			TextView()
+			TextView()
+		}
+	}
+
 }
 
 #Preview {
-    ContentView()
+	Dependencies.register(type: Service.self, in: .preview) { ServicePreview(text: "Service from Preview") }
+
+	return ContentView()
 }
