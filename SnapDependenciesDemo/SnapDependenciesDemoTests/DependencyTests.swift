@@ -16,7 +16,7 @@ struct DependencyTests {
 	}
 	
 	@Test func serviceFromSetup() async throws {
-		@Injected var service: Service
+		@Dependency var service: Service
 
 		#expect(service.getContext() == ".test")
 		
@@ -27,7 +27,7 @@ struct DependencyTests {
 	
 	/// `Dependencies.reset()` has to be executed before each Test.
 	@Test func serviceFromSetupAfterReset() async throws {
-		@Injected var service: Service
+		@Dependency var service: Service
 
 		#expect(service.getContext() == ".test")
 		
@@ -39,7 +39,7 @@ struct DependencyTests {
 	@Test func serviceFromOverride() async throws {
 		Dependencies.register(type: Service.self, in: .override) { ServiceTest(context: "Test") }
 		
-		@Injected var service: Service
+		@Dependency var service: Service
 
 		#expect(service.getContext() == "Test")
 		

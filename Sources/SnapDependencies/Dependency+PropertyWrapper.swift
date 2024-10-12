@@ -4,7 +4,7 @@
 //
 
 @MainActor
-@propertyWrapper public class Injected<Dependency> {
+@propertyWrapper public class Dependency<Dependency> {
 
     public init() {}
 

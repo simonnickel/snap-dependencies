@@ -10,7 +10,7 @@ import Observation
 class DataSource {
 
 	@ObservationIgnored
-	@Injected var service: Service
+	@Dependency var service: Service
 
 	func getServiceCount() -> Int {
 		service.getCount()

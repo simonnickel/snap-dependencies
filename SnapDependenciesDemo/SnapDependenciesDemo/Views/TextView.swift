@@ -8,7 +8,7 @@ import SnapDependencies
 
 struct TextView: View {
 
-	@Injected var dataSource: DataSource
+	@Dependency var dataSource: DataSource
 
 	@State private var textFromService: String = ""
 
