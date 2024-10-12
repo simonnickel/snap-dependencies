@@ -19,7 +19,7 @@ public class Dependencies {
 	private let context: Context
 
 	private init() {
-		let context: Context = ProcessInfo.isPreview ? .preview : .implementation
+		let context: Context = ProcessInfo.isPreview ? .preview : .live
 		self.context = context
 
 		Logger.dependencies.debug("Init shared Dependencies with context: .\(context)")

@@ -6,7 +6,7 @@
 public extension Dependencies {
 	
 	public enum Context: String, CustomStringConvertible, CaseIterable {
-		case base, implementation, preview
+		case base, live, preview, test
 		
 		public var description: String { rawValue }
 	}

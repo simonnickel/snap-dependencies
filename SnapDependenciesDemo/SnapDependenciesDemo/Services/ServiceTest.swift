@@ -3,7 +3,7 @@
 //  Created by Simon Nickel
 //
 
-class ServicePreview: Service {
+class ServiceTest: Service {
 
 	private var context: String = "?"
 	
@@ -26,3 +26,4 @@ class ServicePreview: Service {
 	}
 
 }
+

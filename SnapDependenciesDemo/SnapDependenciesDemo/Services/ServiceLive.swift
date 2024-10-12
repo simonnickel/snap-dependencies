@@ -3,9 +3,9 @@
 //  Created by Simon Nickel
 //
 
-class ServiceImplementation: Service {
+class ServiceLive: Service {
 
-	private var context: String = ".implementation"
+	private var context: String = ".live"
 
 	func getContext() -> String {
 		context
