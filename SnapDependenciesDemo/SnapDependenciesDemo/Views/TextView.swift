@@ -31,7 +31,7 @@ struct TextView: View {
 		.onAppear() {
 			updateText()
 		}
-		.frame(minWidth: 100)
+		.frame(minWidth: 200)
 		.padding()
 	}
 
@@ -41,7 +41,11 @@ struct TextView: View {
 }
 
 #Preview {
-//	Dependencies.register(type: Service.self, in: .preview) { ServicePreview(context: "Preview") }
+	Dependencies.register(type: Service.self, in: .override) { ServicePreview(context: "Preview") }
 
+	return TextView()
+}
+
+#Preview {
 	return TextView()
 }
