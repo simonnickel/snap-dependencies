@@ -29,7 +29,7 @@ The [demo project](/PackageDemo) contains an example setup of Dependencies.
 
 ## How to use
 
-Register your Dependencies by implementing `DependenciesSetup`.
+Register your Dependencies by implementing `DependenciesSetup`:
 ```
 extension Dependencies: @retroactive DependenciesSetup {
 	
@@ -49,6 +49,11 @@ Inject your Dependencies in your code:
 	@ObservationIgnored
 	@Dependency var service: Service
 	...
+	
+	func doingSomething() {
+		@Dependency var service: Service
+		...
+	}
 }
 ```
 
