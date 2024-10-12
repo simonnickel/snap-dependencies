@@ -20,6 +20,10 @@ let package = Package(
         .target(
             name: "SnapDependencies"
 		),
+		.testTarget(
+			name: "SnapDependenciesTests",
+			dependencies: ["SnapDependencies"]
+		),
     ],
     swiftLanguageModes: [.version("6")]
 )
