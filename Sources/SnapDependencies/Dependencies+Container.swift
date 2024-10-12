@@ -7,7 +7,7 @@ import OSLog
 
 internal extension Dependencies {
 	
-	internal class Container {
+	class Container {
 
 		var dependencies: [String: Factory] = [:]
 		var instances: [String: Any] = [:]
