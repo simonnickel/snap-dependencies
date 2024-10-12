@@ -5,9 +5,9 @@
 > This package is part of the [SNAP](https://github.com/simonnickel/snap) suite.
 
 
-# SnapPackage
+# SnapDependencies
 
-Short description ...
+A simple Dependency Injection Container.
 
 [![Documentation][documentation badge]][documentation] 
 
@@ -22,11 +22,58 @@ Steps to setup the package ...
 
 ## Demo project
 
-The [demo project](/PackageDemo) shows ...
+The [demo project](/PackageDemo) contains an example setup of Dependencies.
 
 <img src="/screenshot.png" height="400">
 
 
 ## How to use
 
-Details about package content ...
+Register your Dependencies by implementing `DependenciesSetup`.
+```
+extension Dependencies: @retroactive DependenciesSetup {
+	
+	public func setup() {
+		Dependencies.register(type: Service.self) { ServiceLive() }
+		Dependencies.register(type: Service.self, in: .preview) { ServicePreview(context: ".preview") }
+		Dependencies.register(type: Service.self, in: .test) { ServiceTest(context: ".test") }
+	}
+	
+}
+```
+
+Inject your Dependencies in your code:
+```
+@Observable class DataSource {
+
+	@ObservationIgnored
+	@Dependency var service: Service
+	...
+}
+```
+
+Override registration in Previews:
+```
+#Preview {
+	Dependencies.register(type: Service.self, in: .override) { Service() }
+	...
+}
+```
+
+Override registration in Tests:
+```
+@Suite
+@MainActor
+struct MyAppTests {
+	
+	init() {
+		Dependencies.reset()
+	}
+	
+	@Test func someFeature() async throws {
+		Dependencies.register(type: Service.self, in: .override) { Service() }
+		...
+	}
+	
+}
+```
