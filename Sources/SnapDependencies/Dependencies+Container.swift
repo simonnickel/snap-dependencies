@@ -3,6 +3,8 @@
 //  Created by Simon Nickel
 //
 
+import OSLog
+
 internal extension Dependencies {
 	
 	internal class Container {
@@ -24,7 +26,8 @@ internal extension Dependencies {
 			guard let factory = dependencies[key] else { return nil }
 			guard let resolved = factory() as? Dependency else { return nil }
 
-//			print("Create \(key)")
+			Logger.dependencies.debug("Created `\(key)` from factory")
+			
 			instances[key] = resolved
 			return resolved
 		}

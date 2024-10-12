@@ -5,8 +5,10 @@
 
 public extension Dependencies {
 	
-	public enum Context: CaseIterable {
+	public enum Context: String, CustomStringConvertible, CaseIterable {
 		case base, implementation, preview
+		
+		public var description: String { rawValue }
 	}
 	
 }

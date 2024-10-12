@@ -4,10 +4,10 @@
 //
 
 import Foundation
+import OSLog
 
 // TODO: Define Lifetime: factory or instance? Should reference types always be shared? Do ValueType otherwise.
 // TODO: @MainActor
-// TODO: Logging
 
 @MainActor
 public class Dependencies {
@@ -19,8 +19,11 @@ public class Dependencies {
 	private let context: Context
 
 	private init() {
-		context = ProcessInfo.isPreview ? .preview : .implementation
+		let context: Context = ProcessInfo.isPreview ? .preview : .implementation
+		self.context = context
 
+		Logger.dependencies.debug("Init shared Dependencies with context: .\(context)")
+		
 		for context in Context.allCases {
 			containers[context] = Container()
 		}
@@ -32,11 +35,11 @@ public class Dependencies {
 	private var isSetup: Bool = false
 	private func setupOnce() {
 		guard isSetup == false else { return }
-//		print("Setup once")
+		Logger.dependencies.debug("Setup Dependencies")
 		if let setupable = self as? DependenciesSetup {
 			setupable.setup()
 		} else {
-			fatalError("DependencyContainer not defined - setup not possible.")
+			fatalError("Extension to implement `DependenciesSetup` not defined - setup not possible.")
 		}
 		isSetup = true
 	}
@@ -69,7 +72,7 @@ public class Dependencies {
 		in context: Context = .base,
 		factory: @escaping Factory
 	) {
-		//		print("Register: `\(type)` in context: .\(context)")
+		Logger.dependencies.debug("Register: `\(type)` in context: .\(context)")
 		if isSetup {
 			if ProcessInfo.isPreview {
 				// Required for registering overrides in `#Preview {}`. Views are prepared before the actual Preview is created, causing dependencies to be resolved too early. 
@@ -94,14 +97,14 @@ public class Dependencies {
 	// MARK: - Resolve
 
 	internal static func resolve<Dependency>(_ type: Dependency.Type) -> Dependency {
-//		print("Resolving: `\(type)`")
-
 		let dependencies = Dependencies.shared
-
 		dependencies.setupOnce()
+		
+		Logger.dependencies.debug("Resolving: `\(type)`")
+
 		let container = dependencies.container(for: dependencies.context)
 		if let resolved = container.resolve(type: Dependency.self) {
-//            print("Found `\(type)` in .\(dependencies.context)")
+			Logger.dependencies.debug("Found `\(type)` in .\(dependencies.context)")
 			return resolved
 		} else {
 			let containerBase = dependencies.container(for: .base)
@@ -109,7 +112,7 @@ public class Dependencies {
 			guard let resolved = containerBase.resolve(type: Dependency.self) else {
 				fatalError("Dependency for `\(type)` not registered in context: .\(dependencies.context) or .base")
 			}
-//            print("Found `\(type)` in .base")
+			Logger.dependencies.debug("Found `\(type)` in .base")
 			
 			return resolved
 		}
