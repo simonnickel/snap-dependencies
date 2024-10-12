@@ -10,20 +10,21 @@ struct TextView: View {
 
 	@Injected var dataSource: DataSource
 
-	@State private var text: String = "Hello, initial!"
+	@State private var textFromService: String = ""
 
 	var body: some View {
 		VStack {
-			Text(text)
+			Text("DataSource: \(dataSource.counter)")
+			Text("Service: \(textFromService)")
 			Button {
-				dataSource.set(text: "Hello, updated!")
+				dataSource.increase()
 			} label: {
-				Text("Update Text")
+				Text("Increase")
 			}
 			Button {
 				updateText()
 			} label: {
-				Text("Reload")
+				Text("Load from Sevice")
 			}
 
 		}
@@ -35,12 +36,12 @@ struct TextView: View {
 	}
 
 	private func updateText() {
-		text = dataSource.getText()
+		textFromService = "\(dataSource.getServiceCount()) in \(dataSource.getServiceContext())"
 	}
 }
 
 #Preview {
-//	Dependencies.register(type: Service.self, in: .preview) { ServicePreview(text: "Service from Preview") }
+//	Dependencies.register(type: Service.self, in: .preview) { ServicePreview(context: "Preview") }
 
 	return TextView()
 }

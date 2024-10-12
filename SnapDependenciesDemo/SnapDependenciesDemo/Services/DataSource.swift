@@ -4,17 +4,27 @@
 //
 
 import SnapDependencies
+import Observation
 
+@Observable
 class DataSource {
 
+	@ObservationIgnored
 	@Injected var service: Service
 
-	func getText() -> String {
-		service.getText()
+	func getServiceCount() -> Int {
+		service.getCount()
 	}
+	
+	func getServiceContext() -> String {
+		service.getContext()
+	}
+	
+	var counter: Int = 0
 
-	func set(text: String) {
-		service.set(text: text)
+	func increase() {
+		counter += 1
+		service.set(count: counter)
 	}
 
 }

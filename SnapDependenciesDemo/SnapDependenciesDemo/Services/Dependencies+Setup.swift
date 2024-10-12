@@ -10,7 +10,7 @@ extension Dependencies: @retroactive DependenciesSetup {
 	public func setup() {
 		Dependencies.register(type: Service.self) { ServiceImplementation() }
 		
-		Dependencies.register(type: Service.self, in: .preview) { ServicePreview(text: "Hello, Preview") }
+		Dependencies.register(type: Service.self, in: .preview) { ServicePreview(context: ".preview") }
 
 		Dependencies.register(type: DataSource.self) { DataSource() }
 	}

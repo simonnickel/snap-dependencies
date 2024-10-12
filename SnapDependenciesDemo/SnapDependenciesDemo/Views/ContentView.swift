@@ -18,7 +18,7 @@ struct ContentView: View {
 }
 
 #Preview {
-	Dependencies.register(type: Service.self, in: .preview) { ServicePreview(text: "Service from Preview") }
+	Dependencies.register(type: Service.self, in: .preview) { ServicePreview(context: "#Preview") }
 
 	return ContentView()
 }

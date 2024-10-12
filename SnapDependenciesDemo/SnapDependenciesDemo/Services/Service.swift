@@ -5,7 +5,9 @@
 
 protocol Service {
 
-	func getText() -> String
-	func set(text: String)
+	func getCount() -> Int
+	func set(count: Int)
+
+	func getContext() -> String
 
 }

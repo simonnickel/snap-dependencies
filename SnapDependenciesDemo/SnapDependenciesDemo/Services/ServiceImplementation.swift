@@ -5,14 +5,20 @@
 
 class ServiceImplementation: Service {
 
-	private var text: String = "Hello, Implementation!"
+	private var context: String = ".implementation"
 
-	func getText() -> String {
-		text
+	func getContext() -> String {
+		context
 	}
 
-	func set(text: String) {
-		self.text = text
+	private var count: Int = 0
+	
+	func set(count: Int) {
+		self.count = count
+	}
+	
+	func getCount() -> Int {
+		count
 	}
 
 }

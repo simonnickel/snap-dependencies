@@ -5,18 +5,24 @@
 
 class ServicePreview: Service {
 
-	var text: String
+	private var context: String = "Hello!"
 	
-	init(text: String) {
-		self.text = text
+	init(context: String) {
+		self.context = context
 	}
 
-	func getText() -> String {
-		text
+	func getContext() -> String {
+		context
 	}
 
-	func set(text: String) {
-		self.text = text
+	private var count: Int = 0
+	
+	func set(count: Int) {
+		self.count = count
+	}
+	
+	func getCount() -> Int {
+		count
 	}
 
 }
