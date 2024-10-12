@@ -19,7 +19,7 @@ public class Dependencies {
 	private let context: Context
 
 	private init() {
-		let context: Context = ProcessInfo.isPreview ? .preview : .live
+		let context: Context = ProcessInfo.isTest ? .test : (ProcessInfo.isPreview ? .preview : .live)
 		self.context = context
 
 		Logger.dependencies.debug("Init shared Dependencies with context: .\(context)")
@@ -74,9 +74,10 @@ public class Dependencies {
 	) {
 		Logger.dependencies.debug("Register: `\(type)` in context: .\(context)")
 		if isSetup {
-			if ProcessInfo.isPreview {
-				// Required for registering overrides in `#Preview {}`. Views are prepared before the actual Preview is created, causing dependencies to be resolved too early. 
-				reset()
+			if context == .override && (ProcessInfo.isPreview || ProcessInfo.isTest) {
+				// Required for registering overrides in `#Preview {}` or Tests.
+				// Views are prepared before the actual Preview is created, causing dependencies to be resolved too early. 
+				resetResolutions()
 			} else {
 				fatalError("Register after setup is not allowed! Tried to register `\(type)` in .\(context)")
 			}
@@ -86,11 +87,37 @@ public class Dependencies {
 		container.register(type: Dependency.self, factory: factory)
 	}
 	
-	private func reset() {
+	
+	// MARK: - Reset
+	
+	public static func reset() {
+		shared.resetResolutions()
+		shared.resetRegistrations()
+	}
+	
+	public static func resetResolutions() {
+		shared.resetResolutions()
+	}
+	
+	private func resetResolutions() {
+		Logger.dependencies.debug("Reset Resolutions")
 		for context in Context.allCases {
 			let container = container(for: context)
 			container.instances = [:]
 		}
+	}
+	
+	public static func resetRegistrations() {
+		shared.resetRegistrations()
+	}
+	
+	private func resetRegistrations() {
+		Logger.dependencies.debug("Reset Registrations")
+		for context in Context.allCases {
+			let container = container(for: context)
+			container.dependencies = [:]
+		}
+		isSetup = false
 	}
 	
 	
@@ -101,21 +128,18 @@ public class Dependencies {
 		dependencies.setupOnce()
 		
 		Logger.dependencies.debug("Resolving: `\(type)`")
-
-		let container = dependencies.container(for: dependencies.context)
-		if let resolved = container.resolve(type: Dependency.self) {
-			Logger.dependencies.debug("Found `\(type)` in .\(dependencies.context)")
-			return resolved
-		} else {
-			let containerBase = dependencies.container(for: .base)
-
-			guard let resolved = containerBase.resolve(type: Dependency.self) else {
-				fatalError("Dependency for `\(type)` not registered in context: .\(dependencies.context) or .base")
+		
+		let contexts: [Context] = [.override, dependencies.context, .base]
+		
+		for context in contexts {
+			let container = dependencies.container(for: context)
+			if let resolved = container.resolve(type: Dependency.self) {
+				Logger.dependencies.debug("Found `\(type)` in .\(context)")
+				return resolved
 			}
-			Logger.dependencies.debug("Found `\(type)` in .base")
-			
-			return resolved
 		}
+		
+		fatalError("Dependency for `\(type)` not registered in contexts: .\(contexts)")
 	}
 
 }

@@ -17,8 +17,14 @@ struct ContentView: View {
 
 }
 
+// Use override definition.
 #Preview {
-	Dependencies.register(type: Service.self, in: .preview) { ServicePreview(context: "#Preview") }
+	Dependencies.register(type: Service.self, in: .override) { ServicePreview(context: "#Preview") }
 
+	return ContentView()
+}
+
+// Use definition from Setup.
+#Preview {
 	return ContentView()
 }
