@@ -5,7 +5,7 @@
 
 class ServiceLive: Service {
 
-	private var context: String = ".live"
+	private let context: String = ".live"
 
 	func getContext() -> String {
 		context

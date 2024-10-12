@@ -5,7 +5,7 @@
 
 class ServiceTest: Service {
 
-	private var context: String = "?"
+	private let context: String
 	
 	init(context: String) {
 		self.context = context
@@ -26,4 +26,3 @@ class ServiceTest: Service {
 	}
 
 }
-
