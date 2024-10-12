@@ -6,12 +6,20 @@
 public extension Dependencies {
 	
 	public enum Context: String, CustomStringConvertible, CaseIterable {
+		
+		/// Used when not possible to resolve in other context. Used to register Dependency when no other Context is specified.
 		case base
+		
+		/// Use to register Dependency specific for running App.
 		case live
+		
+		/// Use to register Dependency specific for Previews.
 		case preview
+		
+		/// Use to register Dependency specific for Tests.
 		case test
 		
-		/// Used to override registrations in specific Previews and Tests.
+		/// Use to register Dependency for specific Previews and Tests.
 		/// Provide in `Dependencies.register(type: , in: .override) {}` to use specific implementation.
 		case override
 		
