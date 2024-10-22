@@ -12,6 +12,8 @@ extension Dependencies: @retroactive DependenciesSetup {
 		Dependencies.register(type: Service.self, in: .preview) { ServicePreview(context: ".preview") }
 		Dependencies.register(type: Service.self, in: .test) { ServiceTest(context: ".test") }
 
+		Dependencies.register(type: SomeActor.self) { SomeActor() }
+
 		Dependencies.register(type: DataSource.self) { DataSource() }
 	}
 	

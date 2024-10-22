@@ -8,7 +8,20 @@ import Observation
 
 @Observable
 class DataSource {
+	
+	var counter: Int = 0
+	
+	func increase() {
+		counter += 1
+		service.set(count: counter)
+		Task {
+			await someActor.set(count: counter)
+		}
+	}
 
+	
+	// MARK: Service
+	
 	@ObservationIgnored
 	@Dependency var service: Service
 
@@ -20,11 +33,14 @@ class DataSource {
 		service.getContext()
 	}
 	
-	var counter: Int = 0
+	
+	// MARK: Actor
+	
+	@ObservationIgnored
+	@Dependency var someActor: SomeActor
 
-	func increase() {
-		counter += 1
-		service.set(count: counter)
+	func getActorCount() async -> Int {
+		await someActor.getCount()
 	}
 
 }

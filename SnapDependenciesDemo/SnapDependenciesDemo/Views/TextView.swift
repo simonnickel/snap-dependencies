@@ -11,11 +11,13 @@ struct TextView: View {
 	@Dependency var dataSource: DataSource
 
 	@State private var textFromService: String = ""
+	@State private var actorCount: Int = 0
 
 	var body: some View {
 		VStack {
 			Text("DataSource: \(dataSource.counter)")
 			Text("Service: \(textFromService)")
+			Text("Actor: \(actorCount)")
 			Button {
 				dataSource.increase()
 			} label: {
@@ -31,6 +33,11 @@ struct TextView: View {
 		.onAppear() {
 			updateText()
 		}
+		.onChange(of: dataSource.counter, { oldValue, newValue in
+			Task {
+				actorCount = await dataSource.getActorCount()
+			}
+		})
 		.frame(minWidth: 200)
 		.padding()
 	}
