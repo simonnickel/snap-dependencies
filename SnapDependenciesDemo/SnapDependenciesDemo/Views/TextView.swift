@@ -34,7 +34,7 @@ struct TextView: View {
 			updateText()
 		}
 		.onChange(of: dataSource.counter, { oldValue, newValue in
-			Task {
+			Task { [dataSource] in
 				actorCount = await dataSource.getActorCount()
 			}
 		})

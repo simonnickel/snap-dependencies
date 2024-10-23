@@ -5,7 +5,7 @@
 
 public extension Dependencies {
 	
-	enum Context: String, CustomStringConvertible, CaseIterable {
+	enum Context: String, CustomStringConvertible, CaseIterable, Sendable {
 		
 		/// Used when not possible to resolve in other context. Used to register Dependency when no other Context is specified.
 		case base

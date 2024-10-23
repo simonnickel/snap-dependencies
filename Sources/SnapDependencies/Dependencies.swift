@@ -7,14 +7,13 @@ import Foundation
 import OSLog
 
 // TODO: Define Lifetime: factory or instance? Should reference types always be shared? Do ValueType otherwise.
-// TODO: @MainActor
 
-@MainActor
-public class Dependencies {
+// TODO: unchecked
+final public class Dependencies: @unchecked Sendable {
 	
 	public typealias Factory = () -> Any
 
-	private static var shared: Dependencies = Dependencies()
+	private static let shared: Dependencies = Dependencies()
 	
 	private let context: Context
 

@@ -14,7 +14,8 @@ class DataSource {
 	func increase() {
 		counter += 1
 		service.set(count: counter)
-		Task {
+		
+		Task { [someActor, counter] in
 			await someActor.set(count: counter)
 		}
 	}

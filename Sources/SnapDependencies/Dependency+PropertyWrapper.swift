@@ -3,7 +3,6 @@
 //  Created by Simon Nickel
 //
 
-@MainActor
 @propertyWrapper public class Dependency<Dependency> {
 
     public init() {}
@@ -14,7 +13,6 @@
 
 }
 
-//@MainActor
 //@propertyWrapper public struct InjectedNonLazy<Dependency> {
 //
 //	public let wrappedValue: Dependency

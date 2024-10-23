@@ -5,7 +5,6 @@
 
 public protocol DependenciesSetup {
 	
-	@MainActor
 	func setup()
 	
 }
