@@ -47,12 +47,14 @@ struct TextView: View {
 	}
 }
 
-#Preview {
-	Dependencies.register(type: Service.self, in: .override) { ServicePreview(context: "Preview") }
+// Use override definition.
+#Preview("Override") {
+	Dependencies.register(type: Service.self, in: .override) { ServicePreview(context: "#Preview") }
 
 	return TextView()
 }
 
+// Use definition from Setup.
 #Preview {
 	return TextView()
 }
