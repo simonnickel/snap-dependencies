@@ -15,10 +15,12 @@ internal extension Dependencies {
 		/// **Thread Safety**: Access has to be guarded by a queue.
 		var instances: [String: Any] = [:]
 
+		/// Register the factory for a Dependency type.
+		/// **Thread Safety** Make sure to only use on the queue in serial execution using `.barrier`.
 		func register<Dependency>(type: Dependency.Type, factory: @escaping Factory) {
 			let key: String = "\(type)"
 
-			/// **Thread Safety**: Registering is only done during setup and applying overrides.
+			/// **Thread Safety**: Registering is only done during setup and when applying overrides, executed on serial queue.
 			dependencies[key] = factory
 		}
 
@@ -35,7 +37,6 @@ internal extension Dependencies {
 			} else {
 				return create(type: type, in: queue)
 			}
-			
 		}
 		
 		private func create<Dependency>(type: Dependency.Type, in queue: DispatchQueue) -> Dependency? {

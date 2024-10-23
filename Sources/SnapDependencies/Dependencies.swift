@@ -53,20 +53,25 @@ final public class Dependencies: @unchecked Sendable {
 	
 	// MARK: - Setup
 	
+	private enum SetupState: String {
+		case notStarted, running, done
+	}
+	
 	/// **Thread Safety**: Access has to be guarded by a queue.
-	private var isSetup: Bool = false
+	private var setupState: SetupState = .notStarted
 	
 	private func setupOnce() {
 		/// **Thread Safety**: Access to state has to be on the queue.
-		let isSetup = queue.sync { return self.isSetup }
-		if isSetup == true { return }
+		let setupState = queue.sync { return self.setupState }
+		guard setupState == .notStarted else { return }
 
 		/// **Thread Safety**: Setup is serial to prevent data races.
-		queue.sync(flags: .barrier) {
+		queue.sync {
 			// Need to check again, because setup could be done concurrently, while waiting for .barrier.
-			guard self.isSetup == false else { return }
+			guard self.setupState == .notStarted else { return }
+			self.setupState = .running
 			
-			Logger.dependencies.debug("Setup Dependencies")
+			Logger.dependencies.debug("Setup Dependencies \(self.setupState.rawValue)")
 			
 			if let setupable = self as? DependenciesSetup {
 				setupable.setup()
@@ -74,7 +79,7 @@ final public class Dependencies: @unchecked Sendable {
 				fatalError("Extension to implement `DependenciesSetup` not defined - setup not possible.")
 			}
 			
-			self.isSetup = true
+			self.setupState == .done
 		}
 	}
 
@@ -99,7 +104,11 @@ final public class Dependencies: @unchecked Sendable {
 		in context: Context = .base,
 		factory: @escaping Factory
 	) {
-		Dependencies.shared.register(type: type, in: context, factory: factory)
+		if context == .override {
+			Dependencies.shared.override(type: type, factory: factory)
+		} else {
+			Dependencies.shared.register(type: type, in: context, factory: factory)
+		}
 	}
 	
 	private func register<Dependency>(
@@ -109,23 +118,39 @@ final public class Dependencies: @unchecked Sendable {
 	) {
 		Logger.dependencies.debug("Register: `\(type)` in context: .\(context)")
 		
-		// TODO: This is not required during setup, only when registering additional overrides. Register should not be public, only setup and overriding should be. 
-		/// **Thread Safety**: Access to state has to be on the queue.
-//		let isSetup = queue.sync { return self.isSetup }
+		guard context != .override else {
+			fatalError("Register is not allowed for context `.override`.")
+		}
 		
-		/// **Thread Safety**: Registering is only done during setup.
-		if isSetup {
-			if context == .override && (ProcessInfo.isPreview || ProcessInfo.isTest) {
-				// Required for registering overrides in `#Preview {}` or Tests.
-				// Views are prepared before the actual Preview is created, causing dependencies to be resolved too early.
-				resetResolutions()
-			} else {
-				fatalError("Register after setup is not allowed! Tried to register `\(type)` in .\(context)")
-			}
+		/// **Thread Safety**: Registering is only allowed during setup, .running is only set while on serial queue.
+		guard setupState == .running else {
+			fatalError("Register after setup is not allowed! Tried to register `\(type)` in .\(context)")
 		}
 		
 		let container = container(for: context)
 		container.register(type: Dependency.self, factory: factory)
+	}
+	
+	private func override<Dependency>(
+		type: Dependency.Type,
+		factory: @escaping Factory
+	) {
+		let context: Context = .override
+		Logger.dependencies.debug("Override: `\(type)` in context: .\(context)")
+		
+		if (ProcessInfo.isPreview || ProcessInfo.isTest) {
+			// Required for registering overrides in `#Preview {}` or Tests.
+			// Views are prepared before the actual Preview is created, causing dependencies to be resolved too early.
+			resetResolutions()
+		} else {
+			fatalError("Override is not allowed!")
+		}
+		
+		/// **Thread Safety**: Registering overrides is serial, to prevent data races.
+		queue.sync(flags: .barrier) {
+			let container = container(for: context)
+			container.register(type: Dependency.self, factory: factory)
+		}
 	}
 	
 	
@@ -142,6 +167,7 @@ final public class Dependencies: @unchecked Sendable {
 	
 	private func resetResolutions() {
 		Logger.dependencies.debug("Reset Resolutions")
+		
 		/// **Thread Safety**: Reset is serial to prevent data races.
 		queue.sync(flags: .barrier) {
 			for context in Context.allCases {
@@ -157,13 +183,14 @@ final public class Dependencies: @unchecked Sendable {
 	
 	private func resetRegistrations() {
 		Logger.dependencies.debug("Reset Registrations")
+		
 		/// **Thread Safety**: Reset is serial to prevent data races.
 		queue.sync(flags: .barrier) {
 			for context in Context.allCases {
 				let container = container(for: context)
 				container.dependencies = [:]
 			}
-			isSetup = false
+			setupState = .notStarted
 		}
 	}
 	
