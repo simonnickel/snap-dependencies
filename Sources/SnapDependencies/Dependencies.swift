@@ -126,12 +126,16 @@ final public class Dependencies: @unchecked Sendable {
 		let dependencies = Dependencies.shared
 		dependencies.setupOnce()
 		
+		return dependencies.resolve(type)
+	}
+	
+	private func resolve<Dependency>(_ type: Dependency.Type) -> Dependency {
 		Logger.dependencies.debug("Resolving: `\(type)`")
-		
-		let contexts: [Context] = [.override, dependencies.context, .base]
+
+		let contexts: [Context] = [.override, self.context, .base]
 		
 		for context in contexts {
-			let container = dependencies.container(for: context)
+			let container = self.container(for: context)
 			if let resolved = container.resolve(type: Dependency.self) {
 				Logger.dependencies.debug("Found `\(type)` in .\(context)")
 				return resolved
