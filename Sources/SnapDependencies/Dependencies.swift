@@ -5,6 +5,7 @@
 
 import Foundation
 import OSLog
+import SnapFoundation
 
 // TODO: Triple check thread safety.
 
