@@ -5,9 +5,10 @@
 
 import Foundation
 import OSLog
+import SnapFoundation
 
 internal extension Logger {
 	
-	static let dependencies: Logger = Logger(subsystem: Bundle.main.bundleIdentifier!, category: "SnapDependencies")
+	static let dependencies: Logger = Logger(category: "SnapDependencies")
 	
 }
