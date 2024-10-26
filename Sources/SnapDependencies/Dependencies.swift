@@ -115,6 +115,7 @@ final public class Dependencies: @unchecked Sendable {
 			Dependencies.shared.register(type: type, in: context, factory: factory)
 		}
 	}
+	
 	public static func override<Dependency>(
 		type: Dependency.Type,
 		factory: @escaping Factory
