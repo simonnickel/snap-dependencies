@@ -79,7 +79,7 @@ final public class Dependencies: @unchecked Sendable {
 				fatalError("Extension to implement `DependenciesSetup` not defined - setup not possible.")
 			}
 			
-			self.setupState == .done
+			self.setupState = .done
 		}
 	}
 
