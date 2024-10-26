@@ -15,7 +15,7 @@ struct DependenciesTests {
 	}
 
 	@Test func resolveInContextOverride() async throws {
-		Dependencies.register(type: Service.self, in: .override) { Service(context: "Test") }
+		Dependencies.override(type: Service.self) { Service(context: "Test") }
 
 		@Dependency var service: Service
 		

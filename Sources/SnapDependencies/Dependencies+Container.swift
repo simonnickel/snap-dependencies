@@ -7,24 +7,32 @@ import OSLog
 
 internal extension Dependencies {
 	
-	class Container {
+	/// The `Dependencies` singleton manages a list of `Container`, one for each `Context`.
+	/// The Container is responsible to hold the factories and resolved instances.
+	internal class Container {
 
 		/// **Thread Safety**: Access has to be guarded by a queue.
-		var dependencies: [String: Factory] = [:]
+		private var dependencies: [String: Factory] = [:]
 		
 		/// **Thread Safety**: Access has to be guarded by a queue.
-		var instances: [String: Any] = [:]
+		private var instances: [String: Any] = [:]
 
+		
+		// MARK: - Register
+		
 		/// Register the factory for a Dependency type.
 		/// **Thread Safety** Make sure to only use on the queue in serial execution using `.barrier`.
-		func register<Dependency>(type: Dependency.Type, factory: @escaping Factory) {
+		internal func register<Dependency>(type: Dependency.Type, factory: @escaping Factory) {
 			let key: String = "\(type)"
 
 			/// **Thread Safety**: Registering is only done during setup and when applying overrides, executed on serial queue.
 			dependencies[key] = factory
 		}
 
-		func resolve<Dependency>(type: Dependency.Type, in queue: DispatchQueue) -> Dependency? {
+		
+		// MARK: - Resolve
+		
+		internal func resolve<Dependency>(type: Dependency.Type, in queue: DispatchQueue) -> Dependency? {
 			let key: String = "\(type)"
 			
 			/// **Thread Safety**: Access to state has to be on the queue.
@@ -58,6 +66,16 @@ internal extension Dependencies {
 			}
 		}
 		
+		
+		// MARK: - Reset
+		
+		internal func resetResolutions() {
+			instances = [:]
+		}
+		
+		internal func resetRegistrations() {
+			dependencies = [:]
+		}
 	}
 	
 }

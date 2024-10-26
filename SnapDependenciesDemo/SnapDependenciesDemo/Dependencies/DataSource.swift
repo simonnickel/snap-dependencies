@@ -24,7 +24,7 @@ class DataSource {
 	// MARK: Service
 	
 	@ObservationIgnored
-	@Dependency var service: Service
+	@Dependency private var service: Service
 
 	func getServiceCount() -> Int {
 		service.getCount()
@@ -38,7 +38,7 @@ class DataSource {
 	// MARK: Actor
 	
 	@ObservationIgnored
-	@Dependency var someActor: SomeActor
+	@Dependency private var someActor: SomeActor
 
 	func getActorCount() async -> Int {
 		await someActor.getCount()

@@ -3,6 +3,10 @@
 //  Created by Simon Nickel
 //
 
+/// Property Wrapper to inject Dependencies.
+/// ```
+/// @Dependency private var service: Service
+/// ```
 @propertyWrapper public class Dependency<Dependency> {
 
     public init() {}

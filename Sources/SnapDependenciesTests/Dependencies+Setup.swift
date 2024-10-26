@@ -5,9 +5,9 @@
 
 import SnapDependencies
 
-extension Dependencies: DependenciesSetup {
+extension Dependencies: DependencyRegistration {
 	
-	public func setup() {
+	public func registerDependencies() {
 		Dependencies.register(type: Service.self) { Service(context: ".live") }
 		Dependencies.register(type: Service.self, in: .test) { Service(context: ".test") }
 	}

@@ -5,9 +5,10 @@
 
 public extension Dependencies {
 	
+	/// Use to register a Dependency for a specific `Context`.
 	enum Context: String, CustomStringConvertible, CaseIterable, Sendable {
 		
-		/// Used when not possible to resolve in other context. Used to register Dependency when no other Context is specified.
+		/// Not meant to be used explicitly. Used in register, when no context is specified. Used in resolve, when not found in current context.
 		case base
 		
 		/// Use to register Dependency specific for running App.
@@ -23,7 +24,11 @@ public extension Dependencies {
 		/// Provide in `Dependencies.register(type: , in: .override) {}` to use specific implementation.
 		case override
 		
+		
+		// MARK: CustomStringConvertible
+		
 		public var description: String { rawValue }
+		
 	}
 	
 }

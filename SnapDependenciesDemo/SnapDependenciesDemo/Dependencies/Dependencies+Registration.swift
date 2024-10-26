@@ -5,9 +5,9 @@
 
 import SnapDependencies
 
-extension Dependencies: @retroactive DependenciesSetup {
+extension Dependencies: @retroactive DependencyRegistration {
 	
-	public func setup() {
+	public func registerDependencies() {
 		Dependencies.register(type: Service.self) { ServiceLive() }
 		Dependencies.register(type: Service.self, in: .preview) { ServicePreview(context: ".preview") }
 		Dependencies.register(type: Service.self, in: .test) { ServiceTest(context: ".test") }
