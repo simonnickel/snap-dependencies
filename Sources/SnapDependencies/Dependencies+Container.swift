@@ -9,7 +9,7 @@ internal extension Dependencies {
 	
 	/// The `Dependencies` singleton manages a list of `Container`, one for each `Context`.
 	/// The Container is responsible to hold the factories and resolved instances.
-	internal class Container {
+	class Container {
 
 		/// **Thread Safety**: Access has to be guarded by a queue.
 		private var dependencies: [String: Factory] = [:]
