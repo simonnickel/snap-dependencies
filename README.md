@@ -14,6 +14,15 @@ A simple Dependency Injection Container.
 [documentation]: https://swiftpackageindex.com/simonnickel/snap-dependencies/main/documentation/snapdependencies
 [documentation badge]: https://img.shields.io/badge/Documentation-DocC-blue
 
+Features
+* Override Dependencies for different contexts like Previews and Tests.
+* Lazy initialisation, instance of Dependency is created on first use.
+
+Limitations
+* Registered of Dependencies in a single setup step.
+* Dependencies can not be replaced during runtime.
+* Types as keys, can not register duplicate instances of a Type.
+* No Lifetime definition, a single instance for each Dependency is created.
 
 ## Setup
 
