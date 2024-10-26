@@ -23,7 +23,7 @@ internal extension Dependencies {
 		/// Register the factory for a Dependency type.
 		/// **Thread Safety** Make sure to only use on the queue in serial execution using `.barrier`.
 		internal func register<Dependency>(type: Dependency.Type, factory: @escaping Factory) {
-			let key: String = "\(type)"
+			let key: Key = key(for: type)
 
 			/// **Thread Safety**: Registering is only done during setup and when applying overrides, executed on serial queue.
 			dependencies[key] = factory
@@ -33,8 +33,8 @@ internal extension Dependencies {
 		// MARK: - Resolve
 		
 		internal func resolve<Dependency>(type: Dependency.Type, in queue: DispatchQueue) -> Dependency? {
-			let key: String = "\(type)"
-			
+			let key: Key = key(for: type)
+
 			/// **Thread Safety**: Access to state has to be on the queue.
 			let resolved: Dependency? = queue.sync {
 				return instances[key] as? Dependency
@@ -50,11 +50,9 @@ internal extension Dependencies {
 		/// A lock to prevent creating multiple instances
 		private var lockCreation = os_unfair_lock_s()
 		
-		// TODO: Define Key type
-		// TODO: Generate key for type
 		private func create<Dependency>(type: Dependency.Type, in queue: DispatchQueue) -> Dependency? {
-			let key: String = "\(type)"
-			
+			let key: Key = key(for: type)
+
 			/// **Thread Safety**: Using `queue.sync(flags: .barrier)` causes a deadlock when the resolved dependency has to resolve another dependency during it's initialisation.
 			// To prevent data races:
 			// * inserting the instance is serialised by a lock
@@ -88,6 +86,16 @@ internal extension Dependencies {
 		internal func resetRegistrations() {
 			dependencies = [:]
 		}
+		
+		
+		// MARK: - Key
+		
+		private typealias Key = String
+		
+		private func key<Dependency>(for type: Dependency.Type) -> Key {
+			"\(type)"
+		}
+		
 	}
 	
 }
