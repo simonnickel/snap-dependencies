@@ -164,6 +164,33 @@ final public class Dependencies: @unchecked Sendable {
 	}
 	
 	
+	// MARK: - Resolve
+
+	/// Used by @Dependency property wrapper.
+	internal static func resolve<Dependency>(_ type: Dependency.Type) -> Dependency {
+		let dependencies = Dependencies.shared
+		dependencies.setup()
+		
+		return dependencies.resolve(type)
+	}
+	
+	private func resolve<Dependency>(_ type: Dependency.Type) -> Dependency {
+		Logger.dependencies.debug("Resolving: `\(type)`")
+
+		let contexts: [Context] = [.override, self.context, .base]
+
+		for context in contexts {
+			let container = self.container(for: context)
+			if let resolved = container.resolve(type: Dependency.self, in: queue) {
+				Logger.dependencies.debug("Found `\(type)` in .\(context)")
+				return resolved
+			}
+		}
+		
+		fatalError("Dependency for `\(type)` not registered in contexts: .\(contexts)")
+	}
+	
+	
 	// MARK: - Reset
 	
 	public static func reset() {
@@ -204,31 +231,4 @@ final public class Dependencies: @unchecked Sendable {
 		}
 	}
 	
-	
-	// MARK: - Resolve
-
-	/// Used by @Dependency property wrapper.
-	internal static func resolve<Dependency>(_ type: Dependency.Type) -> Dependency {
-		let dependencies = Dependencies.shared
-		dependencies.setup()
-		
-		return dependencies.resolve(type)
-	}
-	
-	private func resolve<Dependency>(_ type: Dependency.Type) -> Dependency {
-		Logger.dependencies.debug("Resolving: `\(type)`")
-
-		let contexts: [Context] = [.override, self.context, .base]
-
-		for context in contexts {
-			let container = self.container(for: context)
-			if let resolved = container.resolve(type: Dependency.self, in: queue) {
-				Logger.dependencies.debug("Found `\(type)` in .\(context)")
-				return resolved
-			}
-		}
-		
-		fatalError("Dependency for `\(type)` not registered in contexts: .\(contexts)")
-	}
-
 }
