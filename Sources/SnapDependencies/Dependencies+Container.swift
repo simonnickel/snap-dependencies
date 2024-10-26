@@ -47,6 +47,8 @@ internal extension Dependencies {
 			}
 		}
 		
+		// TODO: Define Key type
+		// TODO: Generate key for type
 		private func create<Dependency>(type: Dependency.Type, in queue: DispatchQueue) -> Dependency? {
 			let key: String = "\(type)"
 			
