@@ -28,4 +28,11 @@ struct DependenciesTests {
 		#expect(service.context == ".test")
 	}
 	
+	/// Fails if the resolution produces a deadlock when resolving a dependency while it creates a different dependency, e.g. when one dependency uses a dependency in its init().
+	@Test func resolveWithResolveInInit() async throws {
+		@Dependency var service: ServiceWithServiceInInit
+		
+		#expect(service.context == ".test")
+	}
+	
 }
