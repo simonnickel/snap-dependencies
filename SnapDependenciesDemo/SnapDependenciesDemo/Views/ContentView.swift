@@ -6,12 +6,21 @@
 import SwiftUI
 import SnapDependencies
 
+enum Screen {
+	case example, longInit
+}
+
 struct ContentView: View {
 
 	var body: some View {
-		VStack {
-			TextView()
-			TextView()
+		NavigationStack {
+			ExampleScreen()
+				.navigationDestination(for: Screen.self) { screen in
+					switch screen {
+						case .example: ExampleScreen()
+						case .longInit: LongInitScreen()
+					}
+				}
 		}
 	}
 

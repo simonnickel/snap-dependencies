@@ -15,6 +15,8 @@ extension Dependencies: @retroactive DependenciesSetup {
 		Dependencies.register(type: SomeActor.self) { SomeActor() }
 
 		Dependencies.register(type: DataSource.self) { DataSource() }
+		
+		Dependencies.register(type: LongInitService.self) { LongInitService() }
 	}
 	
 }

@@ -6,7 +6,7 @@
 import SwiftUI
 import SnapDependencies
 
-struct TextView: View {
+struct ExampleContentView: View {
 
 	@Dependency var dataSource: DataSource
 
@@ -51,10 +51,10 @@ struct TextView: View {
 #Preview("Override") {
 	Dependencies.register(type: Service.self, in: .override) { ServicePreview(context: "#Preview") }
 
-	return TextView()
+	return ExampleContentView()
 }
 
 // Use definition from Setup.
 #Preview {
-	return TextView()
+	return ExampleContentView()
 }
