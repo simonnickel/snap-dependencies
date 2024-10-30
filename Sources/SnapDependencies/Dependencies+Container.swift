@@ -11,29 +11,29 @@ internal extension Dependencies {
 	/// The Container is responsible to hold the factories and resolved instances.
 	class Container {
 
-		/// **Thread Safety**: Access has to be guarded by a queue.
-		private var dependencies: [String: Factory] = [:]
+		
+		// MARK: - Override
 		
 		/// **Thread Safety**: Access has to be guarded by a queue.
-		private var instances: [String: Any] = [:]
+		private var overrides: [Key: Factory] = [:]
 		
-		
-		// MARK: - Register
-		
-		/// Register the factory for a Dependency type.
+		/// Register an override for a KeyPath.
 		/// **Thread Safety** Make sure to only use on the queue in serial execution using `.barrier`.
-		internal func register<Dependency>(type: Dependency.Type, factory: @escaping Factory) {
-			let key: Key = key(for: type)
+		internal func override<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>, with factory: @escaping Factory) {
+			let key: Key = Key(for: keyPath)
 
 			/// **Thread Safety**: Registering is only done during setup and when applying overrides, executed on serial queue.
-			dependencies[key] = factory
+			overrides[key] = factory
 		}
 
 		
 		// MARK: - Resolve
 		
-		internal func resolve<Dependency>(type: Dependency.Type, in queue: DispatchQueue) -> Dependency? {
-			let key: Key = key(for: type)
+		/// **Thread Safety**: Access has to be guarded by a queue.
+		private var instances: [Key: Any] = [:]
+		
+		internal func resolve<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>, in queue: DispatchQueue) -> Dependency? {
+			let key = Key(for: keyPath)
 
 			/// **Thread Safety**: Access to state has to be on the queue.
 			let resolved: Dependency? = queue.sync {
@@ -43,29 +43,33 @@ internal extension Dependencies {
 			if let resolved {
 				return resolved
 			} else {
-				return create(type: type, in: queue)
+				return create(keyPath, in: queue)
 			}
 		}
 		
 		/// A lock to prevent creating multiple instances
 		private var lockCreation = os_unfair_lock_s()
 		
-		private func create<Dependency>(type: Dependency.Type, in queue: DispatchQueue) -> Dependency? {
-			let key: Key = key(for: type)
+		private func create<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>, in queue: DispatchQueue) -> Dependency? {
+			let key = Key(for: keyPath)
 
 			/// **Thread Safety**: Using `queue.sync(flags: .barrier)` causes a deadlock when the resolved dependency has to resolve another dependency during it's initialisation.
 			// To prevent data races:
 			// * inserting the instance is serialised by a lock
 			// * existing instances are checked again before inserting
 			return queue.sync {
-				guard let factory = dependencies[key] else { return nil }
 				// Creating can not be secured by lock, would deadlock when the init has to create a dependency.
-				guard let resolved = factory() as? Dependency else { return nil }
+				let resolved = if let overrideFactory = overrides[key], let override = overrideFactory() as? Dependency {
+					override
+				} else {
+					// TODO: Inject instance or closure, instead of using shared?
+					Dependencies.shared[keyPath: keyPath]
+				}
 				
 				os_unfair_lock_lock(&lockCreation)
 				// Need to check again, because it could be created during concurrent resolve, while waiting for .barrier.
 				if (instances[key] as? Dependency) == nil {
-					Logger.dependencies.debug("Created `\(key)` from factory")
+					Logger.dependencies.debug("Created `\(keyPath.debugDescription)` from factory")
 					instances[key] = resolved
 				} else {
 					return nil
@@ -75,7 +79,7 @@ internal extension Dependencies {
 				return resolved
 			}
 		}
-		
+	
 		
 		// MARK: - Reset
 		
@@ -83,19 +87,19 @@ internal extension Dependencies {
 			instances = [:]
 		}
 		
-		internal func resetRegistrations() {
-			dependencies = [:]
-		}
-		
-		
-		// MARK: - Key
-		
-		private typealias Key = String
-		
-		private func key<Dependency>(for type: Dependency.Type) -> Key {
-			"\(type)"
-		}
-		
 	}
 	
+}
+
+
+// MARK: - Key
+
+internal extension Dependencies.Container {
+	typealias Key = Int
+}
+
+internal extension Dependencies.Container.Key {
+	init<Dependency>(for keyPath: KeyPath<Dependencies, Dependency>) {
+		self.init(keyPath.hashValue)
+	}
 }

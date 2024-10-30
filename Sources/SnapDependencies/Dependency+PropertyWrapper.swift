@@ -8,11 +8,15 @@
 /// @Dependency private var service: Service
 /// ```
 @propertyWrapper public class Dependency<Dependency> {
+	
+	private let keyPath: KeyPath<Dependencies, Dependency>
 
-    public init() {}
+	public init(_ keyPath: KeyPath<Dependencies, Dependency>) {
+		self.keyPath = keyPath
+	}
 
     public lazy var wrappedValue: Dependency = {
-        Dependencies.resolve(Dependency.self)
+		Dependencies.resolve(keyPath)
     }()
 
 }

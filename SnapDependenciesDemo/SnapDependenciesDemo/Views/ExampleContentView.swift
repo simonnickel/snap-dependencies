@@ -8,7 +8,7 @@ import SnapDependencies
 
 struct ExampleContentView: View {
 
-	@Dependency var dataSource: DataSource
+	@Dependency(\.dataSource) var dataSource: DataSource
 
 	@State private var textFromService: String = ""
 	@State private var actorCount: Int = 0
@@ -49,7 +49,7 @@ struct ExampleContentView: View {
 
 // Use override definition.
 #Preview("Override") {
-	Dependencies.register(type: Service.self, in: .override) { ServicePreview(context: "#Preview") }
+	Dependencies.override(\.service) { ServicePreview(context: "#Preview") }
 
 	return ExampleContentView()
 }
