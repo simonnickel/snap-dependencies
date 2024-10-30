@@ -59,19 +59,22 @@ internal extension Dependencies {
 			// * existing instances are checked again before inserting
 			return queue.sync {
 				// Creating can not be secured by lock, would deadlock when the init has to create a dependency.
-				let resolved = if let overrideFactory = overrides[key], let override = overrideFactory() as? Dependency {
-					override
+				let resolved: Dependency
+				if let overrideFactory = overrides[key], let override = overrideFactory() as? Dependency {
+					resolved = override
+					Logger.dependencies.debug("Created `\(keyPath.debugDescription)` from override")
 				} else {
 					// TODO: Inject instance or closure, instead of using shared?
-					Dependencies.shared[keyPath: keyPath]
+					resolved = Dependencies.shared[keyPath: keyPath]
+					Logger.dependencies.debug("Created `\(keyPath.debugDescription)` from keyPath")
 				}
 				
 				os_unfair_lock_lock(&lockCreation)
 				// Need to check again, because it could be created during concurrent resolve, while waiting for .barrier.
 				if (instances[key] as? Dependency) == nil {
-					Logger.dependencies.debug("Created `\(keyPath.debugDescription)` from factory")
 					instances[key] = resolved
 				} else {
+					Logger.dependencies.info("Instance for `\(keyPath.debugDescription)` already exists!")
 					return nil
 				}
 				os_unfair_lock_unlock(&lockCreation)

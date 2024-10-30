@@ -38,20 +38,7 @@ final public class Dependencies: @unchecked Sendable {
 		self.context = context
 
 		Logger.dependencies.debug("Init shared Dependencies with context: .\(context)")
-		
-		var containers: [Context: Container] = [:]
-		for context in Context.allCases {
-			containers[context] = Container()
-		}
-		self.containers = containers
 	}
-	
-	
-	// MARK: - Thread Safety
-	
-	/// The queue to put all operations accessing state on. For read operations it is concurrent, but write operations should wait for all operations to finish and then block the queue until they are done.
-	/// This is achieved by defining the queue as `.concurrent` and using `queue.sync(flags: .barrier)` for write operations.
-	private let queue = DispatchQueue(label: "Dependencies", qos: .userInteractive, attributes: .concurrent)
 	
 	
 	// MARK: - Context
@@ -62,19 +49,19 @@ final public class Dependencies: @unchecked Sendable {
 	public static var context: Context {
 		Dependencies.shared.context
 	}
-
+	
 	
 	// MARK: - Container
-
-	/// **Thread Safety**: Containers are setup on init and reference type.
-	private let containers: [Context: Container]
-
-	private func container(for context: Context) -> Container {
-		guard let container = containers[context] else {
-			fatalError("Dependency Container are not set up properly.")
-		}
-		return container
-	}
+	
+	/// **Thread Safety**: Container is setup on init and reference type.
+	private let container: Container = Container()
+	
+	
+	// MARK: - Thread Safety
+	
+	/// The queue to put all operations accessing state on. For read operations it is concurrent, but write operations should wait for all operations to finish and then block the queue until they are done.
+	/// This is achieved by defining the queue as `.concurrent` and using `queue.sync(flags: .barrier)` for write operations.
+	private let queue = DispatchQueue(label: "Dependencies", qos: .userInteractive, attributes: .concurrent)
 	
 	
 	// MARK: - Override
@@ -102,10 +89,10 @@ final public class Dependencies: @unchecked Sendable {
 		
 		/// **Thread Safety**: Registering overrides is serial, to prevent data races.
 		queue.sync(flags: .barrier) {
-			let container = container(for: context)
 			container.override(keyPath, with: factory)
 		}
 	}
+	
 	
 	// MARK: - Resolve
 
@@ -117,40 +104,23 @@ final public class Dependencies: @unchecked Sendable {
 	private func resolve<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>) -> Dependency {
 		Logger.dependencies.debug("Resolving: `\(keyPath.debugDescription)`")
 
-		// TODO: No container needed anymore.
-		let contexts: [Context] = [self.context]
-
-		for context in contexts {
-			let container = self.container(for: context)
-			if let resolved = container.resolve(keyPath, in: queue) {
-				Logger.dependencies.debug("Found `\(keyPath.debugDescription)` in .\(context)")
-				return resolved
-			}
+		if let resolved = container.resolve(keyPath, in: queue) {
+			Logger.dependencies.debug("Found `\(keyPath.debugDescription)`")
+			return resolved
 		}
 		
-		fatalError("Dependency for `\(keyPath.debugDescription)` not registered in contexts: .\(contexts)")
+		fatalError("Dependency for `\(keyPath.debugDescription)` could not be resolved.")
 	}
 	
 	
 	// MARK: - Reset
-	
-	public static func reset() {
-		shared.resetResolutions()
-	}
-	
-	public static func resetResolutions() {
-		shared.resetResolutions()
-	}
 	
 	private func resetResolutions() {
 		Logger.dependencies.debug("Reset Resolutions")
 		
 		/// **Thread Safety**: Reset is serial to prevent data races.
 		queue.sync(flags: .barrier) {
-			for context in Context.allCases {
-				let container = container(for: context)
-				container.resetResolutions()
-			}
+			container.resetResolutions()
 		}
 	}
 	
