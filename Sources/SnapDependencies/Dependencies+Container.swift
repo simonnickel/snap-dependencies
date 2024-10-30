@@ -95,6 +95,10 @@ internal extension Dependencies {
 			instances = [:]
 		}
 		
+		internal func resetOverrides() {
+			overrides = [:]
+		}
+		
 	}
 	
 }

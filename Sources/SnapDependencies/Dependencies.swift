@@ -115,12 +115,27 @@ final public class Dependencies: @unchecked Sendable {
 	
 	// MARK: - Reset
 	
+	/// Used for Tests
+	internal static func reset() {
+		Dependencies.shared.resetResolutions()
+		Dependencies.shared.resetOverrides()
+	}
+	
 	private func resetResolutions() {
 		Logger.dependencies.debug("Reset Resolutions")
 		
 		/// **Thread Safety**: Reset is serial to prevent data races.
 		queue.sync(flags: .barrier) {
 			container.resetResolutions()
+		}
+	}
+	
+	private func resetOverrides() {
+		Logger.dependencies.debug("Reset Overrides")
+		
+		/// **Thread Safety**: Reset is serial to prevent data races.
+		queue.sync(flags: .barrier) {
+			container.resetOverrides()
 		}
 	}
 	

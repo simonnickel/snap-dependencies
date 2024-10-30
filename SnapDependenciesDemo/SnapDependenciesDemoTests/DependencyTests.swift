@@ -5,7 +5,7 @@
 
 import Testing
 @testable import SnapDependenciesDemo
-import SnapDependencies
+@testable import SnapDependencies
 
 @Suite
 @MainActor
@@ -16,7 +16,7 @@ struct DependencyTests {
 	}
 	
 	@Test func serviceFromSetup() async throws {
-		@Dependency var service: Service
+		@Dependency(\.service) var service: Service
 
 		#expect(service.getContext() == ".test")
 		
@@ -27,7 +27,7 @@ struct DependencyTests {
 	
 	/// `Dependencies.reset()` has to be executed before each Test.
 	@Test func serviceFromSetupAfterReset() async throws {
-		@Dependency var service: Service
+		@Dependency(\.service) var service: Service
 
 		#expect(service.getContext() == ".test")
 		
@@ -37,9 +37,9 @@ struct DependencyTests {
 	}
 
 	@Test func serviceFromOverride() async throws {
-		Dependencies.override(type: Service.self) { ServiceTest(context: "Test") }
+		Dependencies.override(\.service) { ServiceTest(context: "Test") }
 		
-		@Dependency var service: Service
+		@Dependency(\.service) var service: Service
 
 		#expect(service.getContext() == "Test")
 		

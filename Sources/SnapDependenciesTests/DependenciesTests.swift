@@ -15,22 +15,22 @@ struct DependenciesTests {
 	}
 
 	@Test func resolveInContextOverride() async throws {
-		Dependencies.override(type: Service.self) { Service(context: "Test") }
+		Dependencies.override(\.service) { Service(context: "Test") }
 
-		@Dependency var service: Service
+		@Dependency(\.service) var service: Service
 		
 		#expect(service.context == "Test")
 	}
 	
 	@Test func resolveInContextTest() async throws {
-		@Dependency var service: Service
+		@Dependency(\.service) var service: Service
 		
 		#expect(service.context == ".test")
 	}
 	
 	/// Fails if the resolution produces a deadlock when resolving a dependency while it creates a different dependency, e.g. when one dependency uses a dependency in its init().
 	@Test func resolveWithResolveInInit() async throws {
-		@Dependency var service: ServiceWithServiceInInit
+		@Dependency(\.serviceWithServiceInInit) var service: ServiceWithServiceInInit
 		
 		#expect(service.context == ".test")
 	}
