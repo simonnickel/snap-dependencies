@@ -14,19 +14,19 @@ A simple Dependency Injection Container.
 [documentation]: https://swiftpackageindex.com/simonnickel/snap-dependencies/main/documentation/snapdependencies
 [documentation badge]: https://img.shields.io/badge/Documentation-DocC-blue
 
-Features
-* Override Dependencies for different contexts like Previews and Tests.
+The goal of the package is an easy approach and solution to Dependency Injection. It will not support all use cases, but allows to understand the implementation. 
+
+**Features**
+* Define Dependencies as KeyPath, allowing distributed setup.
+* Resolve Dependencies with the KeyPath and a PropertyWrapper.
+* Define different resolutions for contexts like Previews and Tests.
+* Override Dependencies for specific Previews and Tests.
 * Lazy initialisation, instance of Dependency is created on first use.
+* Thread-Safe with Swift 6 compatibility.
 
-Limitations
-* Registered of Dependencies in a single setup step.
+**Limitations**
+* No Lifetime definition, a single instance for each KeyPath is created.
 * Dependencies can not be replaced during runtime.
-* Types as keys, can not register duplicate instances of a Type.
-* No Lifetime definition, a single instance for each Dependency is created.
-
-## Setup
-
-Steps to setup the package ...
 
 
 ## Demo project
@@ -38,29 +38,33 @@ The [demo project](/PackageDemo) contains an example setup of Dependencies.
 
 ## How to use
 
-Register your Dependencies by implementing `DependenciesSetup`:
+Register your Dependencies by extending `Dependencies`:
 ```
-extension Dependencies: @retroactive DependenciesSetup {
+extension Dependencies {
 	
-	public func setup() {
-		Dependencies.register(type: Service.self) { ServiceLive() }
-		Dependencies.register(type: Service.self, in: .preview) { ServicePreview(context: ".preview") }
-		Dependencies.register(type: Service.self, in: .test) { ServiceTest(context: ".test") }
+	var service: Service { Service() }
+	
+	var serviceSwitched: Service {
+		switch Dependencies.context {
+			case .preview: Service(context: "Preview")
+			case .test: Service(context: "Test")
+			default: Service()
+		}
 	}
 	
 }
 ```
 
-Inject your Dependencies in your code:
+Inject Dependencies in your code:
 ```
 @Observable class DataSource {
 
 	@ObservationIgnored
-	@Dependency var service: Service
+	@Dependency(\.service) var service: Service
 	...
 	
 	func doingSomething() {
-		@Dependency var service: Service
+		@Dependency(\.service) var service: Service
 		...
 	}
 }
@@ -69,7 +73,7 @@ Inject your Dependencies in your code:
 Override registration in Previews:
 ```
 #Preview {
-	Dependencies.register(type: Service.self, in: .override) { Service() }
+	Dependencies.override(\.service) { ServicePreview() }
 	...
 }
 ```
@@ -85,7 +89,7 @@ struct MyAppTests {
 	}
 	
 	@Test func someFeature() async throws {
-		Dependencies.register(type: Service.self, in: .override) { Service() }
+		Dependencies.override(\.service) { ServiceTest() }
 		...
 	}
 	
