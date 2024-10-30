@@ -19,7 +19,7 @@ import SnapFoundation
 /// ```
 /// Resolve dependencies by using the property wrapper with the defined KeyPath.
 /// ```
-/// @Dependency(\.service) var service: Service
+/// @Dependency(\.service) var service
 /// ```
 ///
 ///	**Thread Safety**

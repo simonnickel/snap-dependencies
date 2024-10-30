@@ -60,11 +60,11 @@ Inject Dependencies in your code:
 @Observable class DataSource {
 
 	@ObservationIgnored
-	@Dependency(\.service) var service: Service
+	@Dependency(\.service) var service
 	...
 	
 	func doingSomething() {
-		@Dependency(\.service) var service: Service
+		@Dependency(\.service) var service
 		...
 	}
 }

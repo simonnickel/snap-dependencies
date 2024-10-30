@@ -8,7 +8,7 @@ import SnapDependencies
 
 struct ExampleContentView: View {
 
-	@Dependency(\.dataSource) var dataSource: DataSource
+	@Dependency(\.dataSource) private var dataSource
 
 	@State private var textFromService: String = ""
 	@State private var actorCount: Int = 0

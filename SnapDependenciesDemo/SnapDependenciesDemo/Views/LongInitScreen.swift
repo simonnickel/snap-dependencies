@@ -8,7 +8,7 @@ import SnapDependencies
 
 struct LongInitScreen: View {
 	
-	@Dependency(\.longInitService) private var longInitService: LongInitService
+	@Dependency(\.longInitService) private var longInitService
 	
 	var body: some View {
 		VStack {

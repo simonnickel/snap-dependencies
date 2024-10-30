@@ -5,7 +5,7 @@
 
 /// Property Wrapper to inject Dependencies.
 /// ```
-/// @Dependency private var service: Service
+/// @Dependency(\.service) private var service: Service
 /// ```
 @propertyWrapper public class Dependency<Dependency> {
 	
@@ -21,12 +21,12 @@
 
 }
 
-//@propertyWrapper public struct InjectedNonLazy<Dependency> {
+//@propertyWrapper public struct DependencyNonLazy<Dependency> {
 //
 //	public let wrappedValue: Dependency
 //
-//	public init() {
-//		self.wrappedValue = Dependencies.resolve(Dependency.self)
+//	public init(_ keyPath: KeyPath<Dependencies, Dependency>) {
+//		self.wrappedValue = Dependencies.resolve(keyPath)
 //	}
 //
 //}
