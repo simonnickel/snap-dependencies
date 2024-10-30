@@ -28,7 +28,7 @@ struct ContentView: View {
 
 // Use override definition.
 #Preview("Override") {
-	Dependencies.override(type: Service.self) { ServicePreview(context: "#Preview") }
+	Dependencies.override(\.service) { ServicePreview(context: "#Preview") }
 
 	return ContentView()
 }

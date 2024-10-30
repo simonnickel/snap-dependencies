@@ -9,7 +9,7 @@ class ServiceWithServiceInInit {
 
 	var context: String = ""
 	
-	@Dependency private var service: Service
+	@Dependency(\.service) private var service: Service
 	
 	init() {
 		updateContext()

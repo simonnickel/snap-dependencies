@@ -9,15 +9,17 @@ import SnapFoundation
 
 // TODO: Triple check thread safety.
 
-/// The Dependency Container to register and resolve dependencies, can only be used via static methods, accessing a shared instance.
+/// The Dependency Container manages dependencies, can only be used via static methods, internally accessing a shared instance.
 ///
-/// Register dependencies by implementing `DependenciesSetup`:
+/// Define dependencies by extending `Dependencies`:
 /// ```
-/// extension Dependencies: @retroactive DependenciesSetup {}
+/// extension Dependencies {
+///		var service: Service { Service() }
+///	}
 /// ```
-/// Resolve dependencies by using the property wrapper:
+/// Resolve dependencies by using the property wrapper with the defined KeyPath.
 /// ```
-/// @Dependency var service: Service
+/// @Dependency(\.service) var service
 /// ```
 ///
 ///	**Thread Safety**
@@ -30,14 +32,7 @@ final public class Dependencies: @unchecked Sendable {
 	public typealias Factory = () -> Any
 
 	/// **Thread Safety**: Swift ensures that static properties are lazily initialized only once.
-	private static let shared: Dependencies = Dependencies()
-	
-	/// The queue to put all operations accessing state on. For read operations it is concurrent, but write operations should wait for all operations to finish and then block the queue until they are done.
-	/// This is achieved by defining the queue as `.concurrent` and using `queue.sync(flags: .barrier)` for write operations.
-	private let queue = DispatchQueue(label: "Dependencies", qos: .userInteractive, attributes: .concurrent)
-	
-	/// The singletons context is determined on initialisation.
-	private let context: Context
+	internal static let shared: Dependencies = Dependencies()
 
 	/// Should only be called once, when the singleton is created.
 	private init() {
@@ -45,163 +40,87 @@ final public class Dependencies: @unchecked Sendable {
 		self.context = context
 
 		Logger.dependencies.debug("Init shared Dependencies with context: .\(context)")
-		
-		var containers: [Context: Container] = [:]
-		for context in Context.allCases {
-			containers[context] = Container()
-		}
-		self.containers = containers
-	}
-
-	
-	// MARK: - Setup
-	
-	private enum SetupState: String {
-		case todo, running, done
 	}
 	
-	/// **Thread Safety**: Access has to be guarded by a queue.
-	private var setupState: SetupState = .todo
 	
-	/// Register all dependencies. Only executes registrations once, exists if already completed.
-	private func setup() {
-		/// **Thread Safety**: Access to state has to be on the queue.
-		let setupState = queue.sync { return self.setupState }
-		
-		guard setupState == .todo else { return }
-
-		/// **Thread Safety**: Setup is serial to prevent data races.
-		queue.sync(flags: .barrier) {
-			// Need to check again, because setup could be done concurrently, while waiting for .barrier.
-			guard self.setupState == .todo else { return }
-			self.setupState = .running
-			
-			Logger.dependencies.debug("Setup Dependencies \(self.setupState.rawValue)")
-			
-			if let registry = self as? DependencyRegistration {
-				registry.registerDependencies()
-			} else {
-				fatalError("Extension to implement `DependenciesSetup` not defined - setup not possible.")
-			}
-			
-			self.setupState = .done
-		}
+	// MARK: - Context
+	
+	/// The singletons context is determined on initialisation.
+	private let context: Context
+	
+	public static var context: Context {
+		Dependencies.shared.context
 	}
-
+	
 	
 	// MARK: - Container
-
-	/// **Thread Safety**: Containers are setup on init and reference type.
-	private let containers: [Context: Container]
-
-	private func container(for context: Context) -> Container {
-		guard let container = containers[context] else {
-			fatalError("Dependency Container are not set up properly.")
-		}
-		return container
-	}
-
 	
-	// MARK: - Register
+	/// **Thread Safety**: Container is setup on init and reference type.
+	private let container: Container = Container()
 	
-	public static func register<Dependency>(
-		type: Dependency.Type,
-		in context: Context = .base,
-		factory: @escaping Factory
-	) {
-		if context == .override {
-			fatalError("Register is not allowed for context `.override`.")
-		} else {
-			Dependencies.shared.register(type: type, in: context, factory: factory)
-		}
-	}
 	
-	public static func override<Dependency>(
-		type: Dependency.Type,
-		factory: @escaping Factory
-	) {
-		Dependencies.shared.override(type: type, factory: factory)
-	}
+	// MARK: - Thread Safety
 	
-	private func register<Dependency>(
-		type: Dependency.Type,
-		in context: Context = .base,
-		factory: @escaping Factory
-	) {
-		Logger.dependencies.debug("Register: `\(type)` in context: .\(context)")
-		
-		guard context != .override else {
-			fatalError("Register is not allowed for context `.override`.")
-		}
-		
-		/// **Thread Safety**: Registering is only allowed during setup, .running is only set while on serial queue.
-		guard setupState == .running else {
-			fatalError("Register after setup is not allowed! Tried to register `\(type)` in .\(context)")
-		}
-		
-		let container = container(for: context)
-		container.register(type: Dependency.self, factory: factory)
-	}
-	
-	private func override<Dependency>(
-		type: Dependency.Type,
-		factory: @escaping Factory
-	) {
-		let context: Context = .override
-		Logger.dependencies.debug("Override: `\(type)` in context: .\(context)")
-		
-		if (ProcessInfo.isPreview || ProcessInfo.isTest) {
-			// Required for registering overrides in `#Preview {}` or Tests.
-			// Views are prepared before the actual Preview is created, causing dependencies to be resolved too early.
-			resetResolutions()
-		} else {
-			fatalError("Override is not allowed!")
-		}
-		
-		/// **Thread Safety**: Registering overrides is serial, to prevent data races.
-		queue.sync(flags: .barrier) {
-			let container = container(for: context)
-			container.register(type: Dependency.self, factory: factory)
-		}
-	}
+	/// The queue to put all operations accessing state on. For read operations it is concurrent, but write operations should wait for all operations to finish and then block the queue until they are done.
+	/// This is achieved by defining the queue as `.concurrent` and using `queue.sync(flags: .barrier)` for write operations.
+	private let queue = DispatchQueue(label: "Dependencies", qos: .userInteractive, attributes: .concurrent)
 	
 	
 	// MARK: - Resolve
 
 	/// Used by @Dependency property wrapper.
-	internal static func resolve<Dependency>(_ type: Dependency.Type) -> Dependency {
-		let dependencies = Dependencies.shared
-		dependencies.setup()
-		
-		return dependencies.resolve(type)
+	internal static func resolve<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>) -> Dependency {
+		return Dependencies.shared.resolve(keyPath)
 	}
 	
-	private func resolve<Dependency>(_ type: Dependency.Type) -> Dependency {
-		Logger.dependencies.debug("Resolving: `\(type)`")
+	private func resolve<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>) -> Dependency {
+		Logger.dependencies.debug("Resolving: `\(keyPath.debugDescription)`")
 
-		let contexts: [Context] = [.override, self.context, .base]
-
-		for context in contexts {
-			let container = self.container(for: context)
-			if let resolved = container.resolve(type: Dependency.self, in: queue) {
-				Logger.dependencies.debug("Found `\(type)` in .\(context)")
-				return resolved
-			}
+		if let resolved = container.resolve(keyPath, in: queue) {
+			Logger.dependencies.debug("Found `\(keyPath.debugDescription)`")
+			return resolved
 		}
 		
-		fatalError("Dependency for `\(type)` not registered in contexts: .\(contexts)")
+		fatalError("Dependency for `\(keyPath.debugDescription)` could not be resolved.")
+	}
+	
+	
+	// MARK: - Override
+	
+	public static func override<Dependency>(
+		_ keyPath: KeyPath<Dependencies, Dependency>,
+		with factory: @escaping Factory
+	) {
+		Dependencies.shared.override(keyPath, with: factory)
+	}
+	
+	private func override<Dependency>(
+		_ keyPath: KeyPath<Dependencies, Dependency>,
+		with factory: @escaping Factory
+	) {
+		Logger.dependencies.debug("Override: `\(keyPath.debugDescription)`")
+		
+		guard (ProcessInfo.isPreview || ProcessInfo.isTest) else {
+			fatalError("Override is not allowed!")
+		}
+		
+		// Required for registering overrides in `#Preview {}` or Tests.
+		// Views are prepared before the actual Preview is created, causing dependencies to be resolved before the override is set.
+		resetResolutions()
+		
+		/// **Thread Safety**: Registering overrides is serial, to prevent data races.
+		queue.sync(flags: .barrier) {
+			container.override(keyPath, with: factory)
+		}
 	}
 	
 	
 	// MARK: - Reset
 	
-	public static func reset() {
-		shared.resetResolutions()
-		shared.resetRegistrations()
-	}
-	
-	public static func resetResolutions() {
-		shared.resetResolutions()
+	/// Used for Tests
+	internal static func reset() {
+		Dependencies.shared.resetResolutions()
+		Dependencies.shared.resetOverrides()
 	}
 	
 	private func resetResolutions() {
@@ -209,27 +128,16 @@ final public class Dependencies: @unchecked Sendable {
 		
 		/// **Thread Safety**: Reset is serial to prevent data races.
 		queue.sync(flags: .barrier) {
-			for context in Context.allCases {
-				let container = container(for: context)
-				container.resetResolutions()
-			}
+			container.resetResolutions()
 		}
 	}
 	
-	public static func resetRegistrations() {
-		shared.resetRegistrations()
-	}
-	
-	private func resetRegistrations() {
-		Logger.dependencies.debug("Reset Registrations")
+	private func resetOverrides() {
+		Logger.dependencies.debug("Reset Overrides")
 		
 		/// **Thread Safety**: Reset is serial to prevent data races.
 		queue.sync(flags: .barrier) {
-			for context in Context.allCases {
-				let container = container(for: context)
-				container.resetRegistrations()
-			}
-			setupState = .todo
+			container.resetOverrides()
 		}
 	}
 	
