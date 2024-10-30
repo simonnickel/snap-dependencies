@@ -95,3 +95,33 @@ struct MyAppTests {
 	
 }
 ```
+
+### Forwarding
+
+Forwarding is an optional feature. It allows to define and use a KeyPath in a package, but provide the actual dependency in the consuming package.
+
+Define the KeyPath in a package:
+```
+public extension Dependencies {
+
+	var service: Service { Dependencies.forwarding(for: \.service) }
+
+}
+```
+
+Implement the protocol DependencyForwardingFactory in your app and create an instance of the expected type:
+```
+extension Dependencies: @retroactive DependencyForwardingFactory {
+	
+	public func create<Dependency>(for keyPath: KeyPath<Dependencies, Dependency>) -> Dependency? {
+		switch keyPath {
+				
+			case \.service: Service() as? Dependency
+				
+			default: nil
+
+		}
+	}
+	
+}
+``` 

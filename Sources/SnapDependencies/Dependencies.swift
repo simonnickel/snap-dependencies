@@ -115,6 +115,25 @@ final public class Dependencies: @unchecked Sendable {
 	}
 	
 	
+	// MARK: - Forwarding
+	
+	public static func forwarding<Dependency>(for keyPath: KeyPath<Dependencies, Dependency>) -> Dependency {
+		guard let resolved = Dependencies.shared.forwarding(for: keyPath) else {
+			fatalError("Forwarding for `\(keyPath.debugDescription)` could not be resolved.")
+		}
+		return resolved
+	}
+	
+	private func forwarding<Dependency>(for keyPath: KeyPath<Dependencies, Dependency>) -> Dependency? {
+		Logger.dependencies.debug("Find forwarding for: `\(keyPath.debugDescription)`")
+
+		guard let factory = Dependencies.shared as? DependencyForwardingFactory else {
+			fatalError("Dependency forwarding not implemented.")
+		}
+		return factory.create(for: keyPath)
+	}
+	
+	
 	// MARK: - Reset
 	
 	/// Used for Tests
