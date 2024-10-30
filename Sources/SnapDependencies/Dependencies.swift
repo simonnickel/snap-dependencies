@@ -9,15 +9,17 @@ import SnapFoundation
 
 // TODO: Triple check thread safety.
 
-/// The Dependency Container to register and resolve dependencies, can only be used via static methods, accessing a shared instance.
+/// The Dependency Container manages dependencies, can only be used via static methods, internally accessing a shared instance.
 ///
-/// Register dependencies by implementing `DependenciesSetup`:
+/// Define dependencies by extending `Dependencies`:
 /// ```
-/// extension Dependencies: @retroactive DependenciesSetup {}
+/// extension Dependencies {
+///		var service: Service { Service() }
+///	}
 /// ```
-/// Resolve dependencies by using the property wrapper:
+/// Resolve dependencies by using the property wrapper with the defined KeyPath.
 /// ```
-/// @Dependency var service: Service
+/// @Dependency(\.service) var service: Service
 /// ```
 ///
 ///	**Thread Safety**
@@ -98,13 +100,13 @@ final public class Dependencies: @unchecked Sendable {
 	) {
 		Logger.dependencies.debug("Override: `\(keyPath.debugDescription)`")
 		
-		if (ProcessInfo.isPreview || ProcessInfo.isTest) {
-			// Required for registering overrides in `#Preview {}` or Tests.
-			// Views are prepared before the actual Preview is created, causing dependencies to be resolved too early.
-			resetResolutions()
-		} else {
+		guard (ProcessInfo.isPreview || ProcessInfo.isTest) else {
 			fatalError("Override is not allowed!")
 		}
+		
+		// Required for registering overrides in `#Preview {}` or Tests.
+		// Views are prepared before the actual Preview is created, causing dependencies to be resolved before the override is set.
+		resetResolutions()
 		
 		/// **Thread Safety**: Registering overrides is serial, to prevent data races.
 		queue.sync(flags: .barrier) {

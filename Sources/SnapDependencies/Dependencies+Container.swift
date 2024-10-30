@@ -7,7 +7,7 @@ import OSLog
 
 internal extension Dependencies {
 	
-	/// The Container is responsible to manage resolved instances.
+	/// The Container manages resolved instances and stores overrides.
 	class Container {
 
 		
