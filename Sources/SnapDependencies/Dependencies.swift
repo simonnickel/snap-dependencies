@@ -64,6 +64,25 @@ final public class Dependencies: @unchecked Sendable {
 	private let queue = DispatchQueue(label: "Dependencies", qos: .userInteractive, attributes: .concurrent)
 	
 	
+	// MARK: - Resolve
+
+	/// Used by @Dependency property wrapper.
+	internal static func resolve<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>) -> Dependency {
+		return Dependencies.shared.resolve(keyPath)
+	}
+	
+	private func resolve<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>) -> Dependency {
+		Logger.dependencies.debug("Resolving: `\(keyPath.debugDescription)`")
+
+		if let resolved = container.resolve(keyPath, in: queue) {
+			Logger.dependencies.debug("Found `\(keyPath.debugDescription)`")
+			return resolved
+		}
+		
+		fatalError("Dependency for `\(keyPath.debugDescription)` could not be resolved.")
+	}
+	
+	
 	// MARK: - Override
 	
 	public static func override<Dependency>(
@@ -91,25 +110,6 @@ final public class Dependencies: @unchecked Sendable {
 		queue.sync(flags: .barrier) {
 			container.override(keyPath, with: factory)
 		}
-	}
-	
-	
-	// MARK: - Resolve
-
-	/// Used by @Dependency property wrapper.
-	internal static func resolve<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>) -> Dependency {
-		return Dependencies.shared.resolve(keyPath)
-	}
-	
-	private func resolve<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>) -> Dependency {
-		Logger.dependencies.debug("Resolving: `\(keyPath.debugDescription)`")
-
-		if let resolved = container.resolve(keyPath, in: queue) {
-			Logger.dependencies.debug("Found `\(keyPath.debugDescription)`")
-			return resolved
-		}
-		
-		fatalError("Dependency for `\(keyPath.debugDescription)` could not be resolved.")
 	}
 	
 	

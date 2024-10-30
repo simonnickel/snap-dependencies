@@ -7,24 +7,14 @@ import OSLog
 
 internal extension Dependencies {
 	
-	/// The `Dependencies` singleton manages a list of `Container`, one for each `Context`.
-	/// The Container is responsible to hold the factories and resolved instances.
+	/// The Container is responsible to manage resolved instances.
 	class Container {
 
 		
-		// MARK: - Override
+		// MARK: - Thread Safety
 		
-		/// **Thread Safety**: Access has to be guarded by a queue.
-		private var overrides: [Key: Factory] = [:]
-		
-		/// Register an override for a KeyPath.
-		/// **Thread Safety** Make sure to only use on the queue in serial execution using `.barrier`.
-		internal func override<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>, with factory: @escaping Factory) {
-			let key: Key = Key(for: keyPath)
-
-			/// **Thread Safety**: Registering is only done during setup and when applying overrides, executed on serial queue.
-			overrides[key] = factory
-		}
+		/// A lock to prevent creating multiple instances
+		private var lockCreation = os_unfair_lock_s()
 
 		
 		// MARK: - Resolve
@@ -47,9 +37,8 @@ internal extension Dependencies {
 			}
 		}
 		
-		/// A lock to prevent creating multiple instances
-		private var lockCreation = os_unfair_lock_s()
 		
+		// MARK: - Create
 		private func create<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>, in queue: DispatchQueue) -> Dependency? {
 			let key = Key(for: keyPath)
 
@@ -61,12 +50,13 @@ internal extension Dependencies {
 				// Creating can not be secured by lock, would deadlock when the init has to create a dependency.
 				let resolved: Dependency
 				if let overrideFactory = overrides[key], let override = overrideFactory() as? Dependency {
+					Logger.dependencies.debug("Create `\(keyPath.debugDescription)` from override")
+					
 					resolved = override
-					Logger.dependencies.debug("Created `\(keyPath.debugDescription)` from override")
 				} else {
-					// TODO: Inject instance or closure, instead of using shared?
+					Logger.dependencies.debug("Create `\(keyPath.debugDescription)` from keyPath")
+					
 					resolved = Dependencies.shared[keyPath: keyPath]
-					Logger.dependencies.debug("Created `\(keyPath.debugDescription)` from keyPath")
 				}
 				
 				os_unfair_lock_lock(&lockCreation)
@@ -81,6 +71,21 @@ internal extension Dependencies {
 				
 				return resolved
 			}
+		}
+		
+		
+		// MARK: - Override
+		
+		/// **Thread Safety**: Access has to be guarded by a queue.
+		private var overrides: [Key: Factory] = [:]
+		
+		/// Register an override for a KeyPath.
+		/// **Thread Safety** Make sure to only use on the queue in serial execution using `.barrier`.
+		internal func override<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>, with factory: @escaping Factory) {
+			let key: Key = Key(for: keyPath)
+
+			/// **Thread Safety**: Registering is only done during setup and when applying overrides, executed on serial queue.
+			overrides[key] = factory
 		}
 	
 		
