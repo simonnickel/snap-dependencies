@@ -35,6 +35,3 @@ public protocol DependencyForwardingFactory {
 	func create<Dependency>(for keyPath: KeyPath<Dependencies, Dependency>) -> Dependency?
 	
 }
-
-// TODO: Use in Demo
-// TODO: Add Tests

@@ -7,8 +7,6 @@ import Foundation
 import OSLog
 import SnapFoundation
 
-// TODO: Triple check thread safety.
-
 /// The Dependency Container manages dependencies, can only be used via static methods, internally accessing a shared instance.
 ///
 /// Define dependencies by extending `Dependencies`:
@@ -24,7 +22,7 @@ import SnapFoundation
 ///
 ///	**Thread Safety**
 ///
-/// Is thread safe because access is guarded by a DispatchQueue, therefor it is marked as @unchecked Sendable.
+/// Is thread safe because access is guarded by a DispatchQueue, therefore it is marked as @unchecked Sendable.
 /// A barrier is used on a concurrent queue in order to synchronise writes. While reading can be concurrent, write access has to be synchronised. The barrier switches between concurrent and serial queues and performs as a serial queue until the code in barrier block finishes its execution and switches back to a concurrent queue after executing the barrier block.
 /// See comments marked with `**Thread Safety**:` for details.
 final public class Dependencies: @unchecked Sendable {
