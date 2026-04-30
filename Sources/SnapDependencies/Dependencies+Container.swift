@@ -4,115 +4,101 @@
 //
 
 import OSLog
+import os
 
 internal extension Dependencies {
-	
+
 	/// The Container manages resolved instances and stores overrides.
-	class Container {
+	///
+	/// **Thread Safety**
+	///
+	/// All mutable state lives inside an `OSAllocatedUnfairLock<State>`. Every read and write
+	/// of `instances` and `overrides` goes through `lock.withLock { ... }`, so there is a single
+	/// source of truth for synchronization.
+	///
+	/// Building a dependency happens *outside* the lock so that a dependency whose `init`
+	/// resolves another dependency does not deadlock on lock re-entry. The consequence is that
+	/// two threads racing to resolve the same uncached key may both invoke the factory; the
+	/// first to re-acquire the lock wins, and the loser's instance is discarded in favor of
+	/// the cached one.
+	final class Container: Sendable {
 
-		
-		// MARK: - Thread Safety
-		
-		/// A lock to prevent creating multiple instances
-		private var lockCreation = os_unfair_lock_s()
+		/// State stored under the lock. Values may be non-`Sendable` user types, so the
+		/// `uncheckedState` / `withLockUnchecked` variants of `OSAllocatedUnfairLock` are
+		/// used. The lock itself guarantees mutual exclusion.
+		private struct State {
+			var instances: [Key: Any] = [:]
+			var overrides: [Key: Factory] = [:]
+		}
 
-		
+		private let lock = OSAllocatedUnfairLock(uncheckedState: State())
+
+
 		// MARK: - Resolve
-		
-		/// **Thread Safety**: Access has to be guarded by a queue.
-		private var instances: [Key: Any] = [:]
-		
-		internal func resolve<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>, in queue: DispatchQueue) -> Dependency? {
-			let key = Key(for: keyPath)
 
-			/// **Thread Safety**: Access to state has to be on the queue.
-			let resolved: Dependency? = queue.sync {
-				return instances[key] as? Dependency
+		internal func resolve<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>) -> Dependency? {
+			let key: Key = keyPath
+
+			// Fast path: already resolved.
+			if let existing = lock.withLockUnchecked({ $0.instances[key] as? Dependency }) {
+				return existing
 			}
-			
-			if let resolved {
-				return resolved
+
+			// Snapshot the override factory under the lock, then build outside the lock.
+			let overrideFactory = lock.withLockUnchecked { $0.overrides[key] }
+
+			let resolved: Dependency
+			if let overrideFactory, let override = overrideFactory() as? Dependency {
+				Logger.dependencies.debug("Create `\(keyPath.debugDescription)` from override")
+				resolved = override
 			} else {
-				return create(keyPath, in: queue)
+				Logger.dependencies.debug("Create `\(keyPath.debugDescription)` from keyPath")
+				resolved = Dependencies.shared[keyPath: keyPath]
 			}
-		}
-		
-		
-		// MARK: - Create
-		
-		private func create<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>, in queue: DispatchQueue) -> Dependency? {
-			let key = Key(for: keyPath)
 
-			/// **Thread Safety**: Using `queue.sync(flags: .barrier)` causes a deadlock when the resolved dependency has to resolve another dependency during it's initialisation.
-			// To prevent data races:
-			// * inserting the instance is serialised by a lock
-			// * existing instances are checked again before inserting
-			return queue.sync {
-				// Creating can not be secured by lock, would deadlock when the init has to create a dependency.
-				let resolved: Dependency
-				if let overrideFactory = overrides[key], let override = overrideFactory() as? Dependency {
-					Logger.dependencies.debug("Create `\(keyPath.debugDescription)` from override")
-					
-					resolved = override
-				} else {
-					Logger.dependencies.debug("Create `\(keyPath.debugDescription)` from keyPath")
-					
-					resolved = Dependencies.shared[keyPath: keyPath]
+			// Re-acquire to insert. Double-check under the lock so a concurrent resolve of
+			// the same key returns the already-cached instance instead of overwriting it.
+			return lock.withLockUnchecked { state in
+				if let existing = state.instances[key] as? Dependency {
+					Logger.dependencies.info("Instance for `\(keyPath.debugDescription)` already exists, returning cached!")
+					return existing
 				}
-				
-				os_unfair_lock_lock(&lockCreation)
-				// Need to check again, because it could be created during concurrent resolve, while waiting for .barrier.
-				if (instances[key] as? Dependency) == nil {
-					instances[key] = resolved
-				} else {
-					Logger.dependencies.info("Instance for `\(keyPath.debugDescription)` already exists!")
-					return nil
-				}
-				os_unfair_lock_unlock(&lockCreation)
-				
+				state.instances[key] = resolved
 				return resolved
 			}
 		}
-		
-		
-		// MARK: - Override
-		
-		/// **Thread Safety**: Access has to be guarded by a queue.
-		private var overrides: [Key: Factory] = [:]
-		
-		/// Register an override for a KeyPath.
-		/// **Thread Safety** Make sure to only use on the queue in serial execution using `.barrier`.
-		internal func override<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>, with factory: @escaping Factory) {
-			let key: Key = Key(for: keyPath)
 
-			/// **Thread Safety**: Registering is only done during setup and when applying overrides, executed on serial queue.
-			overrides[key] = factory
+
+		// MARK: - Override
+
+		internal func override<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>, with factory: @escaping Factory) {
+			let key: Key = keyPath
+			lock.withLockUnchecked { state in
+				state.overrides[key] = factory
+			}
 		}
-	
-		
+
+
 		// MARK: - Reset
-		
+
 		internal func resetResolutions() {
-			instances = [:]
+			lock.withLockUnchecked { $0.instances = [:] }
 		}
-		
+
 		internal func resetOverrides() {
-			overrides = [:]
+			lock.withLockUnchecked { $0.overrides = [:] }
 		}
-		
+
 	}
-	
+
 }
 
 
 // MARK: - Key
 
 internal extension Dependencies.Container {
-	typealias Key = Int
-}
-
-internal extension Dependencies.Container.Key {
-	init<Dependency>(for keyPath: KeyPath<Dependencies, Dependency>) {
-		self.init(keyPath.hashValue)
-	}
+	/// `PartialKeyPath<Dependencies>` keeps the root type but erases the value type, so
+	/// `KeyPath<Dependencies, _>` instances can serve as keys. KeyPath equality and hashing
+	/// are identity-based — no risk of `Int` hash collisions.
+	typealias Key = PartialKeyPath<Dependencies>
 }

@@ -22,9 +22,9 @@ import SnapFoundation
 ///
 ///	**Thread Safety**
 ///
-/// Is thread safe because access is guarded by a DispatchQueue, therefore it is marked as @unchecked Sendable.
-/// A barrier is used on a concurrent queue in order to synchronise writes. While reading can be concurrent, write access has to be synchronised. The barrier switches between concurrent and serial queues and performs as a serial queue until the code in barrier block finishes its execution and switches back to a concurrent queue after executing the barrier block.
-/// See comments marked with `**Thread Safety**:` for details.
+/// All mutable state is encapsulated in `Container`, which guards access with an
+/// `OSAllocatedUnfairLock`. `Dependencies` itself only holds immutable `let` storage and is
+/// safe to share across threads.
 final public class Dependencies: @unchecked Sendable {
 	
 	public typealias Factory = () -> Any
@@ -52,33 +52,26 @@ final public class Dependencies: @unchecked Sendable {
 	
 	
 	// MARK: - Container
-	
-	/// **Thread Safety**: Container is setup on init and reference type.
+
+	/// All mutable state lives here, guarded by the container's internal lock.
 	private let container: Container = Container()
-	
-	
-	// MARK: - Thread Safety
-	
-	/// The queue to put all operations accessing state on. For read operations it is concurrent, but write operations should wait for all operations to finish and then block the queue until they are done.
-	/// This is achieved by defining the queue as `.concurrent` and using `queue.sync(flags: .barrier)` for write operations.
-	private let queue = DispatchQueue(label: "Dependencies", qos: .userInteractive, attributes: .concurrent)
-	
-	
+
+
 	// MARK: - Resolve
 
 	/// Used by @Dependency property wrapper.
 	internal static func resolve<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>) -> Dependency {
 		return Dependencies.shared.resolve(keyPath)
 	}
-	
+
 	private func resolve<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>) -> Dependency {
 		Logger.dependencies.debug("Resolving: `\(keyPath.debugDescription)`")
 
-		if let resolved = container.resolve(keyPath, in: queue) {
+		if let resolved = container.resolve(keyPath) {
 			Logger.dependencies.debug("Found `\(keyPath.debugDescription)`")
 			return resolved
 		}
-		
+
 		fatalError("Dependency for `\(keyPath.debugDescription)` could not be resolved.")
 	}
 	
@@ -105,11 +98,8 @@ final public class Dependencies: @unchecked Sendable {
 		// Required for registering overrides in `#Preview {}` or Tests.
 		// Views are prepared before the actual Preview is created, causing dependencies to be resolved before the override is set.
 		resetResolutions()
-		
-		/// **Thread Safety**: Registering overrides is serial, to prevent data races.
-		queue.sync(flags: .barrier) {
-			container.override(keyPath, with: factory)
-		}
+
+		container.override(keyPath, with: factory)
 	}
 	
 	
@@ -142,20 +132,14 @@ final public class Dependencies: @unchecked Sendable {
 	
 	private func resetResolutions() {
 		Logger.dependencies.debug("Reset Resolutions")
-		
-		/// **Thread Safety**: Reset is serial to prevent data races.
-		queue.sync(flags: .barrier) {
-			container.resetResolutions()
-		}
+
+		container.resetResolutions()
 	}
-	
+
 	private func resetOverrides() {
 		Logger.dependencies.debug("Reset Overrides")
-		
-		/// **Thread Safety**: Reset is serial to prevent data races.
-		queue.sync(flags: .barrier) {
-			container.resetOverrides()
-		}
+
+		container.resetOverrides()
 	}
 	
 }
