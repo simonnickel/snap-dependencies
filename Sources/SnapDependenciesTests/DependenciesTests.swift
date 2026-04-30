@@ -31,8 +31,36 @@ struct DependenciesTests {
 	/// Fails if the resolution produces a deadlock when resolving a dependency while it creates a different dependency, e.g. when one dependency uses a dependency in its init().
 	@Test func resolveWithResolveInInit() async throws {
 		@Dependency(\.serviceWithServiceInInit) var service: ServiceWithServiceInInit
-		
+
 		#expect(service.context == ".test")
 	}
-	
+
+	/// `@Dependency` resolves on every read, so an override set *after* declaring the property is observed.
+	/// This mirrors the SwiftUI Preview pattern where views may be constructed before the `#Preview` body sets the override.
+	@Test func dependencyObservesOverrideAfterConstruction() async throws {
+		@Dependency(\.service) var service: Service
+
+		Dependencies.override(\.service) { Service(context: "AfterConstruction") }
+
+		#expect(service.context == "AfterConstruction")
+	}
+
+	/// `@DependencyResolved` captures the value at owner-init, so overrides set *after* declaration are NOT observed for this instance.
+	@Test func dependencyResolvedDoesNotObserveOverrideAfterConstruction() async throws {
+		@DependencyResolved(\.service) var captured: Service
+
+		Dependencies.override(\.service) { Service(context: "AfterConstruction") }
+
+		#expect(captured.context == ".test")
+	}
+
+	/// `@DependencyResolved` declared after an override picks up the override at construction.
+	@Test func dependencyResolvedSeesOverrideSetBeforeConstruction() async throws {
+		Dependencies.override(\.service) { Service(context: "BeforeConstruction") }
+
+		@DependencyResolved(\.service) var captured: Service
+
+		#expect(captured.context == "BeforeConstruction")
+	}
+
 }
