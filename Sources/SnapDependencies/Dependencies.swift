@@ -77,25 +77,53 @@ final public class Dependencies: @unchecked Sendable {
 	
 	
 	// MARK: - Override
-	
+
+	/// Register an override factory for `keyPath` and invalidate its cached resolution.
+	///
+	/// The next access to `keyPath` will produce a new instance via `factory`. Cached
+	/// instances of other dependencies are preserved — including any references they
+	/// captured to the previous value of `keyPath`. Set overrides before resolving
+	/// anything that depends on them if you need a fully consistent graph.
+	///
+	/// Typically used in tests, where the cache starts empty (via `Dependencies.reset()`)
+	/// and overrides are set before any dependency is resolved.
 	public static func override<Dependency>(
 		_ keyPath: KeyPath<Dependencies, Dependency>,
 		with factory: @escaping Factory
 	) {
-		Dependencies.shared.override(keyPath, with: factory)
+		Dependencies.shared.override(keyPath, with: factory, scope: .key)
 	}
-	
-	private func override<Dependency>(
+
+	/// Register an override factory for `keyPath` and invalidate **all** cached resolutions.
+	///
+	/// Every dependency will be re-built on next access. Use when callers may have
+	/// resolved dependencies before the override was set and you want subsequent
+	/// resolutions — not only `keyPath` — to start fresh. Note that this can produce
+	/// new instances of dependencies you did not override; existing references to
+	/// those instances are unaffected.
+	///
+	/// Typically used in `#Preview {}`, where SwiftUI prepares views before the preview
+	/// body runs, so dependencies may already be cached against their un-overridden
+	/// definitions when the override is set.
+	public static func overrideResettingAll<Dependency>(
 		_ keyPath: KeyPath<Dependencies, Dependency>,
 		with factory: @escaping Factory
 	) {
+		Dependencies.shared.override(keyPath, with: factory, scope: .all)
+	}
+
+	private func override<Dependency>(
+		_ keyPath: KeyPath<Dependencies, Dependency>,
+		with factory: @escaping Factory,
+		scope: Container.OverrideScope
+	) {
 		Logger.dependencies.debug("Override: `\(keyPath.debugDescription)`")
+        
+        guard (ProcessInfo.isPreview || ProcessInfo.isTest) else {
+            fatalError("Override is not allowed!")
+        }
 
-		guard (ProcessInfo.isPreview || ProcessInfo.isTest) else {
-			fatalError("Override is not allowed!")
-		}
-
-		container.override(keyPath, with: factory)
+		container.override(keyPath, with: factory, scope: scope)
 	}
 	
 	

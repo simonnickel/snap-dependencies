@@ -71,15 +71,24 @@ internal extension Dependencies {
 
 		// MARK: - Override
 
-		internal func override<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>, with factory: @escaping Factory) {
+		internal enum OverrideScope {
+			/// Invalidate every cached instance.
+			case all
+			/// Invalidate only the cached instance for the overridden key.
+			case key
+		}
+
+		internal func override<Dependency>(
+			_ keyPath: KeyPath<Dependencies, Dependency>,
+			with factory: @escaping Factory,
+			scope: OverrideScope
+		) {
 			let key: Key = keyPath
 			lock.withLockUnchecked { state in
-				// Required for registering overrides in `#Preview {}` or Tests.
-				// Views are prepared before the actual Preview is created, causing dependencies
-				// to be resolved before the override is set. Clearing instances and writing the
-				// override under the same lock acquisition prevents a concurrent `resolve` from
-				// caching the un-overridden definition between the two operations.
-				state.instances = [:]
+				switch scope {
+					case .all: state.instances = [:]
+					case .key: state.instances.removeValue(forKey: key)
+				}
 				state.overrides[key] = factory
 			}
 		}
