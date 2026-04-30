@@ -48,9 +48,13 @@ internal extension Dependencies {
 			let overrideFactory = lock.withLockUnchecked { $0.overrides[key] }
 
 			let resolved: Dependency
-			if let overrideFactory, let override = overrideFactory() as? Dependency {
+			if let overrideFactory {
 				Logger.dependencies.debug("Create `\(keyPath.debugDescription)` from override")
-				resolved = override
+                let value = overrideFactory()
+                guard let override = value as? Dependency else {
+                    fatalError("Override for `\(keyPath.debugDescription)` returned \(type(of: value)), expected \(Dependency.self)")
+                }
+                resolved = override
 			} else {
 				Logger.dependencies.debug("Create `\(keyPath.debugDescription)` from keyPath")
 				resolved = Dependencies.shared[keyPath: keyPath]
