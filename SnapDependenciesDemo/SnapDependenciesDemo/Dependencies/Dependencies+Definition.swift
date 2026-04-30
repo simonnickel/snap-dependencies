@@ -15,7 +15,10 @@ extension Dependencies {
 		}
 	}
 	var someActor: SomeActor { SomeActor() }
+    
+    @MainActor
 	var dataSource: DataSource { DataSource() }
+    
 	var longInitService: LongInitService { LongInitService() }
 
 }

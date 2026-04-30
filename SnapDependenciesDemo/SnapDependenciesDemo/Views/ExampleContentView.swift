@@ -34,7 +34,7 @@ struct ExampleContentView: View {
 			updateText()
 		}
 		.onChange(of: dataSource.counter, { oldValue, newValue in
-			Task { [dataSource] in
+			Task {
 				actorCount = await dataSource.getActorCount()
 			}
 		})

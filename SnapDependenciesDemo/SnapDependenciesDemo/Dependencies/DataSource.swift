@@ -6,6 +6,7 @@
 import SnapDependencies
 import Observation
 
+@MainActor
 @Observable
 class DataSource {
 	
