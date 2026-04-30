@@ -25,7 +25,7 @@ import SnapFoundation
 /// All mutable state is encapsulated in `Container`, which guards access with an
 /// `OSAllocatedUnfairLock`. `Dependencies` itself only holds immutable `let` storage and is
 /// safe to share across threads.
-final public class Dependencies: @unchecked Sendable {
+final public class Dependencies: Sendable {
 	
 	public typealias Factory = () -> Any
 
