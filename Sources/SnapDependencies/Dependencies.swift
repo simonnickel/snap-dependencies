@@ -90,14 +90,10 @@ final public class Dependencies: @unchecked Sendable {
 		with factory: @escaping Factory
 	) {
 		Logger.dependencies.debug("Override: `\(keyPath.debugDescription)`")
-		
+
 		guard (ProcessInfo.isPreview || ProcessInfo.isTest) else {
 			fatalError("Override is not allowed!")
 		}
-		
-		// Required for registering overrides in `#Preview {}` or Tests.
-		// Views are prepared before the actual Preview is created, causing dependencies to be resolved before the override is set.
-		resetResolutions()
 
 		container.override(keyPath, with: factory)
 	}

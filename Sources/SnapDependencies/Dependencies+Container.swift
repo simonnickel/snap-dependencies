@@ -74,6 +74,12 @@ internal extension Dependencies {
 		internal func override<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>, with factory: @escaping Factory) {
 			let key: Key = keyPath
 			lock.withLockUnchecked { state in
+				// Required for registering overrides in `#Preview {}` or Tests.
+				// Views are prepared before the actual Preview is created, causing dependencies
+				// to be resolved before the override is set. Clearing instances and writing the
+				// override under the same lock acquisition prevents a concurrent `resolve` from
+				// caching the un-overridden definition between the two operations.
+				state.instances = [:]
 				state.overrides[key] = factory
 			}
 		}
