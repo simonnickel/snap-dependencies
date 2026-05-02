@@ -3,6 +3,7 @@
 //  Created by Simon Nickel
 //
 
+import Dispatch
 import Testing
 @testable import SnapDependencies
 
@@ -61,6 +62,40 @@ struct DependenciesTests {
 		@DependencyResolved(\.service) var captured: Service
 
 		#expect(captured.context == "BeforeConstruction")
+	}
+
+	/// An override registered while a `resolve` is mid-build must not be shadowed by the
+	/// stale value the in-flight resolve was about to cache. The slow factory forces the
+	/// interleaving deterministically: the resolve snapshots the first override, blocks
+	/// inside the factory, the second override lands, and only then does the first factory
+	/// return. Without the override-version check, the resolve would commit "First" and
+	/// silently mask the second override.
+	@Test func resolveDoesNotShadowOverrideRegisteredMidBuild() async throws {
+		let (started, startedContinuation) = AsyncStream.makeStream(of: Void.self)
+		let proceed = DispatchSemaphore(value: 0)
+
+		Dependencies.override(\.service) {
+			startedContinuation.yield(())
+			proceed.wait()
+			return Service(context: "First")
+		}
+
+		let resolveTask = Task.detached {
+			@Dependency(\.service) var service: Service
+			return service.context
+		}
+
+		var iterator = started.makeAsyncIterator()
+		_ = await iterator.next()
+
+		Dependencies.override(\.service) { Service(context: "Second") }
+		proceed.signal()
+
+		let resolved = await resolveTask.value
+		#expect(resolved == "Second")
+
+		@Dependency(\.service) var service: Service
+		#expect(service.context == "Second")
 	}
 
 }
