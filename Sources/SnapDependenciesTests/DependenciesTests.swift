@@ -25,7 +25,17 @@ struct DependenciesTests {
 	
 	@Test func resolveInContextTest() async throws {
 		@Dependency(\.service) var service: Service
-		
+
+		#expect(service.context == ".test")
+	}
+
+	/// The container must support non-`Sendable` dependency types — see `Service`'s class
+	/// doc for the rationale. The compile-time check is the real assertion: `Service` is
+	/// non-`Sendable`, so any future change requiring `Sendable` dependencies would break
+	/// this whole suite. The runtime body just exercises the resolve path.
+	@Test func nonSendableDependencyIsSupported() async throws {
+		@Dependency(\.service) var service: Service
+
 		#expect(service.context == ".test")
 	}
 	

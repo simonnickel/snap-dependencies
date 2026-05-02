@@ -27,7 +27,9 @@ import SnapFoundation
 /// safe to share across threads.
 final public class Dependencies: Sendable {
 	
-	public typealias Factory = () -> Any
+	/// Closure used to construct a dependency instance. `@Sendable` constrains the closure, not the value it returns.
+    /// Dependency instances can be non-Sendable. Factories that capture non-Sendable shared state are rejected at compile time.
+	public typealias Factory = @Sendable () -> Any
 
 	/// **Thread Safety**: Swift ensures that static properties are lazily initialized only once.
 	internal static let shared: Dependencies = Dependencies()
