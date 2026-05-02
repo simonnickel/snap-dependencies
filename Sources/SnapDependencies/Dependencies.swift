@@ -22,12 +22,14 @@ import SnapFoundation
 ///
 ///	**Thread Safety**
 ///
-/// Is thread safe because access is guarded by a DispatchQueue, therefore it is marked as @unchecked Sendable.
-/// A barrier is used on a concurrent queue in order to synchronise writes. While reading can be concurrent, write access has to be synchronised. The barrier switches between concurrent and serial queues and performs as a serial queue until the code in barrier block finishes its execution and switches back to a concurrent queue after executing the barrier block.
-/// See comments marked with `**Thread Safety**:` for details.
-final public class Dependencies: @unchecked Sendable {
+/// All mutable state is encapsulated in `Container`, which guards access with an
+/// `OSAllocatedUnfairLock`. `Dependencies` itself only holds immutable `let` storage and is
+/// safe to share across threads.
+final public class Dependencies: Sendable {
 	
-	public typealias Factory = () -> Any
+	/// Closure used to construct a dependency instance. `@Sendable` constrains the closure, not the value it returns.
+    /// Dependency instances can be non-Sendable. Factories that capture non-Sendable shared state are rejected at compile time.
+	public typealias Factory = @Sendable () -> Any
 
 	/// **Thread Safety**: Swift ensures that static properties are lazily initialized only once.
 	internal static let shared: Dependencies = Dependencies()
@@ -52,64 +54,83 @@ final public class Dependencies: @unchecked Sendable {
 	
 	
 	// MARK: - Container
-	
-	/// **Thread Safety**: Container is setup on init and reference type.
+
+	/// All mutable state lives here, guarded by the container's internal lock.
 	private let container: Container = Container()
-	
-	
-	// MARK: - Thread Safety
-	
-	/// The queue to put all operations accessing state on. For read operations it is concurrent, but write operations should wait for all operations to finish and then block the queue until they are done.
-	/// This is achieved by defining the queue as `.concurrent` and using `queue.sync(flags: .barrier)` for write operations.
-	private let queue = DispatchQueue(label: "Dependencies", qos: .userInteractive, attributes: .concurrent)
-	
-	
+
+
 	// MARK: - Resolve
 
 	/// Used by @Dependency property wrapper.
 	internal static func resolve<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>) -> Dependency {
 		return Dependencies.shared.resolve(keyPath)
 	}
-	
+
 	private func resolve<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>) -> Dependency {
 		Logger.dependencies.debug("Resolving: `\(keyPath.debugDescription)`")
 
-		if let resolved = container.resolve(keyPath, in: queue) {
+		if let resolved = container.resolve(keyPath) {
 			Logger.dependencies.debug("Found `\(keyPath.debugDescription)`")
 			return resolved
 		}
-		
+
 		fatalError("Dependency for `\(keyPath.debugDescription)` could not be resolved.")
 	}
 	
 	
 	// MARK: - Override
-	
+
+	/// Register an override factory for `keyPath` and invalidate its cached resolution.
+	///
+	/// The next access to `keyPath` will produce a new instance via `factory`. Cached
+	/// instances of other dependencies are preserved — including any references they
+	/// captured to the previous value of `keyPath` (e.g. via `@DependencyResolved` or
+	/// values stored at init). Set overrides before resolving anything that depends on
+	/// them if you need a fully consistent graph, or use `overrideResettingAll(_:with:)`
+	/// to invalidate the entire cache.
+	///
+	/// Typically used in tests, where the cache starts empty (via `Dependencies.reset()`)
+	/// and overrides are set before any dependency is resolved.
 	public static func override<Dependency>(
 		_ keyPath: KeyPath<Dependencies, Dependency>,
 		with factory: @escaping Factory
 	) {
-		Dependencies.shared.override(keyPath, with: factory)
+		Dependencies.shared.override(keyPath, with: factory, scope: .key)
 	}
-	
-	private func override<Dependency>(
+
+	/// Register an override factory for `keyPath` and invalidate **all** cached resolutions.
+	///
+	/// Every dependency will be re-built on next access. Use when callers may have
+	/// resolved dependencies before the override was set and you want subsequent
+	/// resolutions — not only `keyPath` — to start fresh. This is the right tool when
+	/// downstream owners use `@DependencyResolved` and have already captured the value
+	/// of `keyPath`: wiping the entire instance cache forces those owners to be rebuilt
+	/// and capture the new override. Note that this can produce new instances of
+	/// dependencies you did not override; existing references held outside the
+	/// container are unaffected.
+	///
+	/// Typically used in `#Preview {}`, where SwiftUI prepares views before the preview
+	/// body runs, so dependencies may already be cached against their un-overridden
+	/// definitions when the override is set.
+	public static func overrideResettingAll<Dependency>(
 		_ keyPath: KeyPath<Dependencies, Dependency>,
 		with factory: @escaping Factory
 	) {
+		Dependencies.shared.override(keyPath, with: factory, scope: .all)
+	}
+
+	private func override<Dependency>(
+		_ keyPath: KeyPath<Dependencies, Dependency>,
+		with factory: @escaping Factory,
+		scope: Container.OverrideScope
+	) {
 		Logger.dependencies.debug("Override: `\(keyPath.debugDescription)`")
-		
-		guard (ProcessInfo.isPreview || ProcessInfo.isTest) else {
-			fatalError("Override is not allowed!")
-		}
-		
-		// Required for registering overrides in `#Preview {}` or Tests.
-		// Views are prepared before the actual Preview is created, causing dependencies to be resolved before the override is set.
-		resetResolutions()
-		
-		/// **Thread Safety**: Registering overrides is serial, to prevent data races.
-		queue.sync(flags: .barrier) {
-			container.override(keyPath, with: factory)
-		}
+        
+        guard (ProcessInfo.isPreview || ProcessInfo.isTest) else {
+            fatalError("Override is not allowed!")
+        }
+
+		container.override(keyPath, with: factory, scope: scope)
 	}
 	
 	
@@ -142,20 +163,14 @@ final public class Dependencies: @unchecked Sendable {
 	
 	private func resetResolutions() {
 		Logger.dependencies.debug("Reset Resolutions")
-		
-		/// **Thread Safety**: Reset is serial to prevent data races.
-		queue.sync(flags: .barrier) {
-			container.resetResolutions()
-		}
+
+		container.resetResolutions()
 	}
-	
+
 	private func resetOverrides() {
 		Logger.dependencies.debug("Reset Overrides")
-		
-		/// **Thread Safety**: Reset is serial to prevent data races.
-		queue.sync(flags: .barrier) {
-			container.resetOverrides()
-		}
+
+		container.resetOverrides()
 	}
 	
 }

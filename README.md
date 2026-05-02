@@ -18,7 +18,7 @@ The goal of the package is an easy approach and solution to Dependency Injection
 
 **Features**
 * Define Dependencies as KeyPath, allowing distributed setup.
-* Resolve Dependencies with the KeyPath and a PropertyWrapper.
+* Resolve Dependencies with the KeyPath and one of two PropertyWrappers (`@Dependency` for lazy reads, `@DependencyResolved` for capture-at-init).
 * Define different resolutions for contexts like Previews and Tests.
 * Override Dependencies for specific Previews and Tests.
 * Lazy initialisation, instance of Dependency is created on first use.
@@ -67,6 +67,29 @@ Inject Dependencies in your code:
 		@Dependency(\.service) var service
 		...
 	}
+}
+```
+
+### `@Dependency` vs `@DependencyResolved`
+
+Two property wrappers are provided. Pick based on when you want resolution to happen.
+
+* `@Dependency` (default): resolves on every read via the container's cache. The owning type does not capture the value, so overrides set *after* the owner is constructed are observed on the next read. This is what makes the SwiftUI Preview override pattern work — SwiftUI may construct views before `#Preview { … }` runs the override. Use this for SwiftUI views and any owner whose dependencies might be overridden after construction.
+
+* `@DependencyResolved`: resolves once inside the wrapper's `init` and stores the value. Subsequent reads are direct field accesses — no lock or dictionary lookup. Use this for long-lived owners (e.g. an `@Observable` view model held for the lifetime of a feature) that read their dependencies on hot paths. Trade-offs:
+  * The cost of resolving the dependency is paid at owner-init even if the property is never read.
+  * Overrides set *after* the owner is constructed are not observed by this property. To force re-resolution downstream, use `Dependencies.overrideResettingAll(...)` which clears all cached instances so the owner itself will be rebuilt on next access.
+  * `Sendable` only when `Dependency: Sendable`, since the value is stored. For non-`Sendable` dependencies in a `Sendable` owner, prefer `@Dependency`.
+
+```
+@MainActor
+@Observable
+class DataSource {
+
+    @ObservationIgnored
+    @DependencyResolved(\.service) private var service
+
+    func getServiceCount() -> Int { service.getCount() }
 }
 ```
 
