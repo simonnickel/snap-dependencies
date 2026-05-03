@@ -69,12 +69,9 @@ final public class Dependencies: Sendable {
 	private func resolve<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>) -> Dependency {
 		Logger.dependencies.debug("Resolving: `\(keyPath.debugDescription)`")
 
-		if let resolved = container.resolve(keyPath) {
-			Logger.dependencies.debug("Found `\(keyPath.debugDescription)`")
-			return resolved
-		}
-
-		fatalError("Dependency for `\(keyPath.debugDescription)` could not be resolved.")
+		let resolved = container.resolve(keyPath)
+		Logger.dependencies.debug("Found `\(keyPath.debugDescription)`")
+		return resolved
 	}
 	
 	

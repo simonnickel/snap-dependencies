@@ -53,7 +53,7 @@ internal extension Dependencies {
 		/// 4. **commit** — store the built value, or signal `.raced` to retry.
 		///
 		/// On `.raced`, the resolve recurses with a fresh snapshot. Depth is bounded by the count of overrides actually racing with this resolve (vanishingly small in practice).
-		internal func resolve<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>) -> Dependency? {
+		internal func resolve<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>) -> Dependency {
 			let key: Key = keyPath
 
 			if let cached: Dependency = cachedInstance(for: key) { return cached }
