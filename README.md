@@ -1,150 +1,134 @@
 <!-- Copy badges from SPI -->
 [![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fsimonnickel%2Fsnap-dependencies%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/simonnickel/snap-dependencies)
-[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fsimonnickel%2Fsnap-dependencies%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/simonnickel/snap-dependencies) 
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fsimonnickel%2Fsnap-dependencies%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/simonnickel/snap-dependencies)
 
 > This package is part of the [SNAP](https://github.com/simonnickel/snap) suite.
 
 
 # SnapDependencies
 
-A simple Dependency Injection Container.
+A small Dependency Injection container for Swift.
 
-[![Documentation][documentation badge]][documentation] 
+[![Documentation][documentation badge]][documentation]
 
 [documentation]: https://swiftpackageindex.com/simonnickel/snap-dependencies/main/documentation/snapdependencies
 [documentation badge]: https://img.shields.io/badge/Documentation-DocC-blue
 
-The goal of the package is an easy approach and solution to Dependency Injection. It will not support all use cases, but allows to understand the implementation. 
 
-**Features**
-* Define Dependencies as KeyPath, allowing distributed setup.
-* Resolve Dependencies with the KeyPath and one of two PropertyWrappers (`@Dependency` for lazy reads, `@DependencyResolved` for capture-at-init).
-* Define different resolutions for contexts like Previews and Tests.
-* Override Dependencies for specific Previews and Tests.
-* Lazy initialisation, instance of Dependency is created on first use.
-* Thread-Safe with Swift 6 compatibility.
+## Features
 
-**Limitations**
-* No Lifetime definition, a single instance for each KeyPath is created.
-* Dependencies can not be replaced during runtime.
+* Define dependencies as `KeyPath` extensions on `Dependencies`, allowing distributed setup across modules.
+* Resolve with one of two property wrappers:
+  * `@Dependency` — resolves on every read; observes overrides set after the owner is constructed; `Sendable` regardless of the dependency type.
+  * `@DependencyResolved` — resolves once at owner-init and stores the value; cheaper reads; cannot observe later overrides; `Sendable` only when the dependency is `Sendable`.
+* Auto-detected `Context` (`.live`, `.preview`, `.test`) from `ProcessInfo` — branch on `Dependencies.context` to register different implementations per environment.
+* Override any dependency in `.preview` and `.test`. Overrides outside those contexts trap; an override factory returning the wrong type also traps.
+* Forwarding lets a package declare a `KeyPath` whose concrete value is provided by the consuming app.
+
+
+## Limitations
+
+* One instance per `KeyPath` for the lifetime of the container; no per-resolution lifetimes.
+* Dependencies are immutable in `.live`; replacement is only available via overrides in `.preview` and `.test`.
+* The container is a process-wide singleton. Tests share state and call `Dependencies.reset()` (currently `internal` — consumers need `@testable import`).
 
 
 ## Demo project
 
-The [demo project](/PackageDemo) contains an example setup of Dependencies.
+The [demo project](/SnapDependenciesDemo) shows a full setup including overrides in `#Preview`, an `@Observable` view model, and a long-init service.
 
 <img src="/screenshot.png" height="400">
 
 
-## How to use
+## Usage
 
-Register your Dependencies by extending `Dependencies`:
-```
+### Register
+
+```swift
 extension Dependencies {
-	
-	var service: Service { Service() }
-	
-	var serviceSwitched: Service {
-		switch Dependencies.context {
-			case .preview: Service(context: "Preview")
-			case .test: Service(context: "Test")
-			default: Service()
-		}
-	}
-	
+
+    var service: Service { Service() }
+
+    var contextual: Service {
+        switch Dependencies.context {
+            case .preview: ServicePreview()
+            case .test:    ServiceTest()
+            default:       ServiceLive()
+        }
+    }
 }
 ```
 
-Inject Dependencies in your code:
-```
-@Observable class DataSource {
+### Resolve
 
-	@ObservationIgnored
-	@Dependency(\.service) var service
-	...
-	
-	func doingSomething() {
-		@Dependency(\.service) var service
-		...
-	}
-}
-```
-
-### `@Dependency` vs `@DependencyResolved`
-
-Two property wrappers are provided. Pick based on when you want resolution to happen.
-
-* `@Dependency` (default): resolves on every read via the container's cache. The owning type does not capture the value, so overrides set *after* the owner is constructed are observed on the next read. This is what makes the SwiftUI Preview override pattern work — SwiftUI may construct views before `#Preview { … }` runs the override. Use this for SwiftUI views and any owner whose dependencies might be overridden after construction.
-
-* `@DependencyResolved`: resolves once inside the wrapper's `init` and stores the value. Subsequent reads are direct field accesses — no lock or dictionary lookup. Use this for long-lived owners (e.g. an `@Observable` view model held for the lifetime of a feature) that read their dependencies on hot paths. Trade-offs:
-  * The cost of resolving the dependency is paid at owner-init even if the property is never read.
-  * Overrides set *after* the owner is constructed are not observed by this property. To force re-resolution downstream, use `Dependencies.overrideResettingAll(...)` which clears all cached instances so the owner itself will be rebuilt on next access.
-  * `Sendable` only when `Dependency: Sendable`, since the value is stored. For non-`Sendable` dependencies in a `Sendable` owner, prefer `@Dependency`.
-
-```
+```swift
 @MainActor
 @Observable
 class DataSource {
 
     @ObservationIgnored
-    @DependencyResolved(\.service) private var service
+    @Dependency(\.service) var service             // resolves on every read
 
-    func getServiceCount() -> Int { service.getCount() }
+    @ObservationIgnored
+    @DependencyResolved(\.service) var captured    // resolves once at init
 }
 ```
 
-Override registration in Previews:
-```
+Use `@Dependency` for SwiftUI views (SwiftUI may construct views before `#Preview {}` sets the override) and any owner whose dependencies might be overridden after construction. Use `@DependencyResolved` for long-lived owners that read on hot paths and are constructed *after* overrides are set.
+
+### Override in `#Preview`
+
+```swift
 #Preview {
-	Dependencies.override(\.service) { ServicePreview() }
-	...
+    Dependencies.overrideResettingAll(\.service) { ServicePreview() }
+    return ContentView()
 }
 ```
 
-Override registration in Tests:
-```
+`overrideResettingAll` clears every cached instance, so any owner constructed before the preview body runs is rebuilt against the new override. Use the lighter `Dependencies.override(_:with:)` when only the overridden key needs invalidating.
+
+### Override in tests
+
+```swift
 @Suite
 @MainActor
-struct MyAppTests {
-	
-	init() {
-		Dependencies.reset()
-	}
-	
-	@Test func someFeature() async throws {
-		Dependencies.override(\.service) { ServiceTest() }
-		...
-	}
-	
+struct MyTests {
+    init() { Dependencies.reset() }    // start each test from a clean cache
+
+    @Test func someFeature() {
+        Dependencies.override(\.service) { ServiceTest() }
+        ...
+    }
 }
 ```
 
-### Forwarding
+### Forwarding (optional)
 
-Forwarding is an optional feature. It allows to define and use a KeyPath in a package, but provide the actual dependency in the consuming package.
+Declare a `KeyPath` in a package without committing to its implementation:
 
-Define the KeyPath in a package:
-```
+```swift
 public extension Dependencies {
-
-	var service: Service { Dependencies.forwarding(for: \.service) }
-
+    var service: Service { Dependencies.forwarding(for: \.service) }
 }
 ```
 
-Implement the protocol DependencyForwardingFactory in your app and create an instance of the expected type:
-```
+Provide the implementation in the consuming app:
+
+```swift
 extension Dependencies: @retroactive DependencyForwardingFactory {
-	
-	public func create<Dependency>(for keyPath: KeyPath<Dependencies, Dependency>) -> Dependency? {
-		switch keyPath {
-				
-			case \.service: Service() as? Dependency
-				
-			default: nil
-
-		}
-	}
-	
+    public func create<T>(for keyPath: KeyPath<Dependencies, T>) -> T? {
+        switch keyPath {
+            case \.service: Service() as? T
+            default:        nil
+        }
+    }
 }
-``` 
+```
+
+
+## Design notes
+
+* **Thread safety**: all mutable container state is guarded by `OSAllocatedUnfairLock`. Non-`Sendable` dependency types are supported — the container takes responsibility for the cross-isolation hand-off via the lock.
+* **Build outside the lock**: a factory that itself resolves another dependency does not deadlock on lock re-entry. A double-check on insert ensures two threads racing on the same key converge on a single cached instance.
+* **Override-version race detection**: an override registered while a build is in flight bumps a version counter; the in-flight build detects the mismatch at commit and re-resolves, so a stale value is never cached after a concurrent override.
+* **Type-safe overrides**: an override factory returning the wrong type traps with a clear message rather than silently falling back to the default.
