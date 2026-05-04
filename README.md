@@ -30,7 +30,7 @@ A small Dependency Injection container for Swift.
 
 * One instance per `KeyPath` for the lifetime of the container; no per-resolution lifetimes.
 * Dependencies are immutable in `.live`; replacement is only available via overrides in `.preview` and `.test`.
-* The container is a process-wide singleton. Tests share state and call `Dependencies.reset()` (currently `internal` — consumers need `@testable import`).
+* The container is a process-wide singleton. Tests share state, so call `Dependencies.reset()` between tests (currently `internal` — consumers need `@testable import`).
 
 
 ## Demo project
@@ -89,7 +89,11 @@ Use `@Dependency` for SwiftUI views (SwiftUI may construct views before `#Previe
 
 ### Override in tests
 
+`Dependencies.reset()` is `internal`, so the test target needs `@testable import SnapDependencies`.
+
 ```swift
+@testable import SnapDependencies
+
 @Suite
 @MainActor
 struct MyTests {
