@@ -15,6 +15,13 @@ A small Dependency Injection container for Swift.
 [documentation badge]: https://img.shields.io/badge/Documentation-DocC-blue
 
 
+## Requirements
+
+- iOS 18+ / macOS 15+
+- Swift 6.3+ (swift-tools-version 6.3)
+- Depends on [`snap-foundation`](https://github.com/simonnickel/snap-foundation)
+
+
 ## Features
 
 * Define dependencies as `KeyPath` extensions on `Dependencies`, allowing distributed setup across modules.
@@ -85,7 +92,7 @@ Use `@Dependency` for SwiftUI views (SwiftUI may construct views before `#Previe
 }
 ```
 
-`overrideResettingAll` clears every cached instance, so any owner constructed before the preview body runs is rebuilt against the new override. Use the lighter `Dependencies.override(_:with:)` when only the overridden key needs invalidating.
+`overrideResettingAll` clears every cached instance in the container, so the next resolution of any dependency builds a fresh value with the override in effect. Existing owners that already captured a value via `@DependencyResolved` are unaffected — only owners constructed *after* the reset see the new override (SwiftUI typically reconstructs preview views, which is why this works in `#Preview`). Use the lighter `Dependencies.override(_:with:)` when only the overridden key needs invalidating.
 
 ### Override in tests
 
@@ -120,9 +127,9 @@ Provide the implementation in the consuming app:
 
 ```swift
 extension Dependencies: @retroactive DependencyForwardingFactory {
-    public func create<T>(for keyPath: KeyPath<Dependencies, T>) -> T? {
+    public func create<Dependency>(for keyPath: KeyPath<Dependencies, Dependency>) -> Dependency? {
         switch keyPath {
-            case \.service: Service() as? T
+            case \.service: Service() as? Dependency
             default:        nil
         }
     }
