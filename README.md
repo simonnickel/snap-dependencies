@@ -92,7 +92,7 @@ Use `@Dependency` for SwiftUI views (SwiftUI may construct views before `#Previe
 }
 ```
 
-`overrideResettingAll` clears every cached instance in the container, so the next resolution of any dependency builds a fresh value with the override in effect. Existing owners that already captured a value via `@DependencyResolved` are unaffected — only owners constructed *after* the reset see the new override (SwiftUI typically reconstructs preview views, which is why this works in `#Preview`). Use the lighter `Dependencies.override(_:with:)` when only the overridden key needs invalidating.
+`overrideResettingAll` clears every cached instance in the container, so the next resolution of any dependency builds a fresh value with the override in effect. Existing `@DependencyResolved` owners that already captured a value are unaffected — only `@DependencyResolved` owners constructed *after* the reset see the new override. Existing `@Dependency` owners always observe the current container state on their next read (SwiftUI typically reconstructs preview views, which is why this works in `#Preview`). Use the lighter `Dependencies.override(_:with:)` when only the overridden key needs invalidating.
 
 ### Override in tests
 
