@@ -153,4 +153,4 @@ extension Dependencies: @retroactive DependencyForwardingFactory {
 * Compile-time registration validation (e.g. via macro or build plugin) to catch unregistered dependencies before runtime.
 * Cycle detection — trap with a clear message instead of infinite recursion when factories form a cycle.
 * Simplify forwarding — replace the `@retroactive` conformance pattern with a registration-based API.
-
+* Explore TaskLocal instead of overrides.
