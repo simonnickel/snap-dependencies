@@ -24,12 +24,12 @@ class DataSource {
 	
 	// MARK: Service
 
-	// `@DependencyResolved` captures the value once at init: cheaper hot-path reads in
-	// `getServiceCount` / `getServiceContext`, at the cost of not observing overrides set
-	// after this `DataSource` was built. The Preview override in `ContentView.swift` works
-	// because the `DataSource` is built lazily on first access, after the override is set.
+	// `.captured` resolves once at init: cheaper hot-path reads in `getServiceCount` /
+	// `getServiceContext`, at the cost of not observing overrides set after this `DataSource`
+	// was built. The Preview override in `ContentView.swift` works because `DataSource` is
+	// built lazily on first access, after the override is set.
 	@ObservationIgnored
-	@DependencyResolved(\.service) private var service
+	@Dependency(\.service, resolve: .captured) private var service
 
 	func getServiceCount() -> Int {
 		service.getCount()
@@ -43,7 +43,7 @@ class DataSource {
 	// MARK: Actor
 
 	@ObservationIgnored
-	@DependencyResolved(\.someActor) private var someActor
+	@Dependency(\.someActor, resolve: .captured) private var someActor
 
 	func getActorCount() async -> Int {
 		await someActor.getCount()

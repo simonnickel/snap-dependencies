@@ -81,7 +81,7 @@ final public class Dependencies: Sendable {
 	///
 	/// The next access to `keyPath` will produce a new instance via `factory`. Cached
 	/// instances of other dependencies are preserved — including any references they
-	/// captured to the previous value of `keyPath` (e.g. via `@DependencyResolved` or
+	/// captured to the previous value of `keyPath` (e.g. via `resolve: .captured` or
 	/// values stored at init). Set overrides before resolving anything that depends on
 	/// them if you need a fully consistent graph, or use `overrideResettingAll(_:with:)`
 	/// to invalidate the entire cache.
@@ -100,7 +100,7 @@ final public class Dependencies: Sendable {
 	/// Every dependency will be re-built on next access. Use when callers may have
 	/// resolved dependencies before the override was set and you want subsequent
 	/// resolutions — not only `keyPath` — to start fresh. This is the right tool when
-	/// downstream owners use `@DependencyResolved` and have already captured the value
+	/// downstream owners use `resolve: .captured` and have already captured the value
 	/// of `keyPath`: wiping the entire instance cache forces those owners to be rebuilt
 	/// and capture the new override. Note that this can produce new instances of
 	/// dependencies you did not override; existing references held outside the

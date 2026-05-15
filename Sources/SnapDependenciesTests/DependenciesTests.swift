@@ -56,20 +56,20 @@ struct DependenciesTests {
 		#expect(service.context == "AfterConstruction")
 	}
 
-	/// `@DependencyResolved` captures the value at owner-init, so overrides set *after* declaration are NOT observed for this instance.
-	@Test func dependencyResolvedDoesNotObserveOverrideAfterConstruction() async throws {
-		@DependencyResolved(\.service) var captured: Service
+	/// `resolve: .captured` captures the value at owner-init, so overrides set *after* declaration are NOT observed for this instance.
+	@Test func dependencyCapturedDoesNotObserveOverrideAfterConstruction() async throws {
+		@Dependency(\.service, resolve: .captured) var captured: Service
 
 		Dependencies.override(\.service) { Service(context: "AfterConstruction") }
 
 		#expect(captured.context == ".test")
 	}
 
-	/// `@DependencyResolved` declared after an override picks up the override at construction.
-	@Test func dependencyResolvedSeesOverrideSetBeforeConstruction() async throws {
+	/// `resolve: .captured` declared after an override picks up the override at construction.
+	@Test func dependencyCapturedSeesOverrideSetBeforeConstruction() async throws {
 		Dependencies.override(\.service) { Service(context: "BeforeConstruction") }
 
-		@DependencyResolved(\.service) var captured: Service
+		@Dependency(\.service, resolve: .captured) var captured: Service
 
 		#expect(captured.context == "BeforeConstruction")
 	}

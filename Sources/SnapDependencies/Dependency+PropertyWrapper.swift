@@ -3,84 +3,57 @@
 //  Created by Simon Nickel
 //
 
-/// Property wrapper that resolves a dependency from the shared `Dependencies` container on every read.
+/// Property wrapper that resolves a dependency from the shared `Dependencies` container.
 ///
+/// ```swift
+/// @Dependency(\.service) var service
+/// @Dependency(\.service, resolve: .captured) var service
 /// ```
-/// @Dependency(\.service) private var service: Service
-/// ```
 ///
-/// **Resolution timing**
+/// **Resolution modes**
 ///
-/// `wrappedValue` is computed: each access goes through `Container`, which caches the resolved
-/// instance after the first access. Resolution is therefore "lazy" with respect to the owner —
-/// constructing a type that holds `@Dependency` does not resolve the dependency. This matters for:
+/// - `.lazy` (default): `wrappedValue` is computed on every read; `Container` caches the
+///   instance after first resolution. Overrides set after the owner is constructed are
+///   observed on the next read. Use for SwiftUI views, where the framework may construct
+///   views before `#Preview {}` sets overrides.
+/// - `.captured`: the dependency is resolved once inside `init` and stored. Cheaper
+///   hot-path reads; overrides set after the owner is constructed are not observed.
 ///
-/// - **Conditional access**: a dependency that is never read in `body` is never resolved.
-/// - **Override after construction**: `Dependencies.override(...)` and `overrideResettingAll(...)`
-///   set after the owner is constructed will be observed on the next read. SwiftUI Previews rely
-///   on this — SwiftUI may construct views before the `#Preview {}` closure runs the override.
+/// **`@unchecked Sendable`**
 ///
-/// **Thread safety**
+/// The wrapper is `@unchecked Sendable` regardless of `Value`. This is safe and necessary
+/// because `KeyPath<Dependencies, NonSendableValue>` does not conform to `Sendable`, even
+/// though a `KeyPath` carries no value — it is pure accessor metadata.
 ///
-/// The wrapper stores only the `KeyPath` and is `Sendable` regardless of `Dependency`. Resolution
-/// goes through `Container`'s lock. Non-Sendable user types are supported; cross-isolation safety
-/// for those instances is the user's responsibility — the same trade-off the container documents.
+/// In `.lazy` mode the struct stores only the `KeyPath`. No value crosses an isolation
+/// boundary when the wrapper is sent. Resolution goes through `Container`'s
+/// `OSAllocatedUnfairLock`, which synchronises creation without requiring `Value: Sendable`.
 ///
-/// **When to prefer `@DependencyResolved`**
-///
-/// Use `@DependencyResolved` when you want to capture the resolved value once at owner-init time
-/// (e.g. a long-lived service held by a long-lived owner that reads it on a hot path). Note that
-/// `@DependencyResolved` cannot observe overrides set after the owner is constructed.
-@propertyWrapper public struct Dependency<Dependency>: @unchecked Sendable {
+/// In `.captured` mode the resolved value is stored. The `@unchecked` means the compiler
+/// will not warn if the wrapper is sent across isolation boundaries. This is safe when
+/// `Value: Sendable` or when all access is confined to a single isolation domain (e.g.
+/// `@MainActor`). For non-`Sendable` values used across isolation, concurrency safety is
+/// the caller's responsibility.
+@propertyWrapper public struct Dependency<Value>: @unchecked Sendable {
 
-	private let keyPath: KeyPath<Dependencies, Dependency>
+	/// Controls when the dependency is resolved.
+	public enum Resolution {
+		/// Resolve on every read. Overrides set after owner construction are observed.
+		case lazy
+		/// Resolve once at owner init. Overrides set after construction are not observed.
+		case captured
+	}
 
-	public init(_ keyPath: KeyPath<Dependencies, Dependency>) {
+	private let keyPath: KeyPath<Dependencies, Value>
+	private let capturedValue: Value?
+
+	public init(_ keyPath: KeyPath<Dependencies, Value>, resolve: Resolution = .lazy) {
 		self.keyPath = keyPath
+		self.capturedValue = resolve == .captured ? Dependencies.resolve(keyPath) : nil
 	}
 
-	public var wrappedValue: Dependency {
-		Dependencies.resolve(keyPath)
-	}
-
-}
-
-
-/// Property wrapper that resolves a dependency once, at owner initialisation, and stores the value.
-///
-/// ```
-/// @DependencyResolved(\.service) private var service: Service
-/// ```
-///
-/// **Resolution timing**
-///
-/// Resolution runs inside the wrapper's `init`, which executes when the owning type is initialised.
-/// The resolved value is captured and reused for every read.
-///
-/// Trade-offs versus `@Dependency`:
-///
-/// - **Pays unconditionally**: if the dependency is expensive to build, that cost is paid at owner
-///   construction even when the property is never read.
-/// - **Sticky to init-time state**: overrides set *after* the owner is constructed are not observed
-///   by this property. `Dependencies.override(...)` / `overrideResettingAll(...)` only affect future
-///   constructions. This makes `@DependencyResolved` unsuitable for SwiftUI views whose dependencies
-///   are overridden in `#Preview {}` after view construction.
-///
-/// **Sendable**
-///
-/// `Sendable` conditional on `Dependency: Sendable`, since the resolved value is stored.
-@propertyWrapper public struct DependencyResolved<Dependency> {
-
-	public let wrappedValue: Dependency
-
-	public init(_ keyPath: KeyPath<Dependencies, Dependency>) {
-		self.wrappedValue = Dependencies.resolve(keyPath)
+	public var wrappedValue: Value {
+		capturedValue ?? Dependencies.resolve(keyPath)
 	}
 
 }
-
-/// `Sendable` only when the resolved value itself is `Sendable`. The wrapper stores the value,
-/// so its safety to share across isolation boundaries depends on `Dependency`'s safety. Owners
-/// that need unconditional `Sendable` for non-`Sendable` dependencies should use `@Dependency`,
-/// which stores only the `KeyPath`.
-extension DependencyResolved: Sendable where Dependency: Sendable {}

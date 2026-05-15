@@ -25,9 +25,9 @@ A small Dependency Injection container for Swift.
 ## Features
 
 * Define dependencies as `KeyPath` extensions on `Dependencies`, allowing distributed setup across modules.
-* Resolve with one of two property wrappers:
-  * `@Dependency` — resolves on every read; observes overrides set after the owner is constructed; `Sendable` regardless of the dependency type.
-  * `@DependencyResolved` — resolves once at owner-init and stores the value; cheaper reads; cannot observe later overrides; `Sendable` only when the dependency is `Sendable`.
+* Resolve with `@Dependency`, with two resolution modes:
+  * `.lazy` (default) — resolves on every read; observes overrides set after the owner is constructed.
+  * `.captured` — resolves once at owner-init and stores the value; cheaper reads; cannot observe later overrides.
 * Auto-detected `Context` (`.live`, `.preview`, `.test`) from `ProcessInfo` — branch on `Dependencies.context` to register different implementations per environment.
 * Override any dependency in `.preview` and `.test`. Overrides outside those contexts trap; an override factory returning the wrong type also traps.
 * Forwarding lets a package declare a `KeyPath` whose concrete value is provided by the consuming app.
@@ -74,14 +74,14 @@ extension Dependencies {
 class DataSource {
 
     @ObservationIgnored
-    @Dependency(\.service) var service             // resolves on every read
+    @Dependency(\.service) var service                          // resolves on every read
 
     @ObservationIgnored
-    @DependencyResolved(\.service) var captured    // resolves once at init
+    @Dependency(\.service, resolve: .captured) var captured    // resolves once at init
 }
 ```
 
-Use `@Dependency` for SwiftUI views (SwiftUI may construct views before `#Preview {}` sets the override) and any owner whose dependencies might be overridden after construction. Use `@DependencyResolved` for long-lived owners that read on hot paths and are constructed *after* overrides are set.
+Use `.lazy` for SwiftUI views (SwiftUI may construct views before `#Preview {}` sets the override) and any owner whose dependencies might be overridden after construction. Use `.captured` for long-lived owners that read on hot paths and are constructed *after* overrides are set.
 
 ### Override in `#Preview`
 
@@ -92,7 +92,7 @@ Use `@Dependency` for SwiftUI views (SwiftUI may construct views before `#Previe
 }
 ```
 
-`overrideResettingAll` clears every cached instance in the container, so the next resolution of any dependency builds a fresh value with the override in effect. Existing `@DependencyResolved` owners that already captured a value are unaffected — only `@DependencyResolved` owners constructed *after* the reset see the new override. Existing `@Dependency` owners always observe the current container state on their next read (SwiftUI typically reconstructs preview views, which is why this works in `#Preview`). Use the lighter `Dependencies.override(_:with:)` when only the overridden key needs invalidating.
+`overrideResettingAll` clears every cached instance in the container, so the next resolution of any dependency builds a fresh value with the override in effect. Existing `resolve: .captured` owners that already captured a value are unaffected — only `.captured` owners constructed *after* the reset see the new override. Existing `.lazy` owners always observe the current container state on their next read (SwiftUI typically reconstructs preview views, which is why this works in `#Preview`). Use the lighter `Dependencies.override(_:with:)` when only the overridden key needs invalidating.
 
 ### Override in tests
 
@@ -139,14 +139,13 @@ extension Dependencies: @retroactive DependencyForwardingFactory {
 
 ## Design notes
 
-* **Thread safety**: all mutable container state is guarded by `OSAllocatedUnfairLock`. Non-`Sendable` dependency types are supported — the container takes responsibility for the cross-isolation hand-off via the lock.
+* **Thread safety**: all mutable container state is guarded by `OSAllocatedUnfairLock`. Non-`Sendable` dependency types are supported — synchronous lock-based resolution means no value crosses an isolation boundary during resolution. `@Dependency` is `@unchecked Sendable` for this reason: the `KeyPath` it stores is pure metadata and carries no value. In `.captured` mode the resolved value is stored; this is safe when `Value: Sendable` or when all access is confined to a single isolation domain (e.g. `@MainActor`).
 * **Build outside the lock**: a factory that itself resolves another dependency does not deadlock on lock re-entry. A double-check on insert ensures two threads racing on the same key converge on a single cached instance.
 * **Override-version race detection**: an override registered while a build is in flight bumps a version counter; the in-flight build detects the mismatch at commit and re-resolves, so a stale value is never cached after a concurrent override.
 * **Type-safe overrides**: an override factory returning the wrong type traps with a clear message rather than silently falling back to the default.
 
 
 ## ToDo
-* Consider merging `@Dependency` and `@DependencyResolved`.
 * Make `reset()` public (or provide a public test-support target) to avoid requiring `@testable import`.
 * Scoped containers / child containers for per-feature or per-screen dependency lifetimes.
 * Async factory support — factories are currently synchronous (`() -> Any`).
