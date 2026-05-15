@@ -19,22 +19,23 @@
 /// - `.captured`: the dependency is resolved once inside `init` and stored. Cheaper
 ///   hot-path reads; overrides set after the owner is constructed are not observed.
 ///
-/// **`@unchecked Sendable`**
+/// **`Sendable`**
 ///
-/// The wrapper is `@unchecked Sendable` regardless of `Value`. This is safe and necessary
-/// because `KeyPath<Dependencies, NonSendableValue>` does not conform to `Sendable`, even
-/// though a `KeyPath` carries no value — it is pure accessor metadata.
+/// `Dependency` uses a conditional `Sendable` conformance:
 ///
-/// In `.lazy` mode the struct stores only the `KeyPath`. No value crosses an isolation
-/// boundary when the wrapper is sent. Resolution goes through `Container`'s
-/// `OSAllocatedUnfairLock`, which synchronises creation without requiring `Value: Sendable`.
+/// - `Dependency<SendableValue>` is `Sendable`. `@unchecked` is applied only in this scope
+///   to accommodate `KeyPath`, which inherits `@unchecked Sendable` from `AnyKeyPath` and
+///   cannot be verified as conditionally `Sendable` by the compiler. The `capturedValue: Value?`
+///   field is genuinely `Sendable` in this scope.
+/// - `Dependency<NonSendableValue>` has no `Sendable` conformance. The compiler will flag any
+///   attempt to use it in a `Sendable` context — the correct behaviour.
 ///
-/// In `.captured` mode the resolved value is stored. The `@unchecked` means the compiler
-/// will not warn if the wrapper is sent across isolation boundaries. This is safe when
-/// `Value: Sendable` or when all access is confined to a single isolation domain (e.g.
-/// `@MainActor`). For non-`Sendable` values used across isolation, concurrency safety is
-/// the caller's responsibility.
-@propertyWrapper public struct Dependency<Value>: @unchecked Sendable {
+/// Non-`Sendable` dependencies are still supported. In actor-isolated owners (e.g. a
+/// `@MainActor` class or an actor), stored properties are not required to be `Sendable` —
+/// the isolation itself provides the safety guarantee. Resolution goes through `Container`'s
+/// `OSAllocatedUnfairLock`, which handles concurrent creation for all `Value` types regardless
+/// of `Sendable`.
+@propertyWrapper public struct Dependency<Value> {
 
 	/// Controls when the dependency is resolved.
 	public enum Resolution {
@@ -57,3 +58,8 @@
 	}
 
 }
+
+/// `@unchecked` is scoped to `Value: Sendable` — `Dependency<NonSendableValue>` has no
+/// conformance and the compiler catches misuse. The `@unchecked` covers only `KeyPath`,
+/// which inherits unconditional `@unchecked Sendable` from `AnyKeyPath`.
+extension Dependency: @unchecked Sendable where Value: Sendable {}

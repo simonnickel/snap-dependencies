@@ -28,6 +28,7 @@ A small Dependency Injection container for Swift.
 * Resolve with `@Dependency`, with two resolution modes:
   * `.lazy` (default) — resolves on every read; observes overrides set after the owner is constructed.
   * `.captured` — resolves once at owner-init and stores the value; cheaper reads; cannot observe later overrides.
+* `Dependency<SendableType>` is `Sendable`; `Dependency<NonSendableType>` is not — the compiler catches unsafe cross-isolation usage automatically. Non-`Sendable` types are safe in actor-isolated owners (e.g. `@MainActor` class).
 * Auto-detected `Context` (`.live`, `.preview`, `.test`) from `ProcessInfo` — branch on `Dependencies.context` to register different implementations per environment.
 * Override any dependency in `.preview` and `.test`. Overrides outside those contexts trap; an override factory returning the wrong type also traps.
 * Forwarding lets a package declare a `KeyPath` whose concrete value is provided by the consuming app.
@@ -139,7 +140,7 @@ extension Dependencies: @retroactive DependencyForwardingFactory {
 
 ## Design notes
 
-* **Thread safety**: all mutable container state is guarded by `OSAllocatedUnfairLock`. Non-`Sendable` dependency types are supported — synchronous lock-based resolution means no value crosses an isolation boundary during resolution. `@Dependency` is `@unchecked Sendable` for this reason: the `KeyPath` it stores is pure metadata and carries no value. In `.captured` mode the resolved value is stored; this is safe when `Value: Sendable` or when all access is confined to a single isolation domain (e.g. `@MainActor`).
+* **Thread safety**: all mutable container state is guarded by `OSAllocatedUnfairLock`. Non-`Sendable` dependency types are supported — synchronous lock-based resolution means no value crosses an isolation boundary during resolution. `@Dependency` uses conditional `Sendable`: `Dependency<Sendable>` is `Sendable` (compiler-verified); `Dependency<NonSendable>` is not, so the compiler catches any attempt to use it in a `Sendable` context.
 * **Build outside the lock**: a factory that itself resolves another dependency does not deadlock on lock re-entry. A double-check on insert ensures two threads racing on the same key converge on a single cached instance.
 * **Override-version race detection**: an override registered while a build is in flight bumps a version counter; the in-flight build detects the mismatch at commit and re-resolves, so a stale value is never cached after a concurrent override.
 * **Type-safe overrides**: an override factory returning the wrong type traps with a clear message rather than silently falling back to the default.
