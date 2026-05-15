@@ -30,7 +30,7 @@ internal extension Dependencies {
 	final class Container: Sendable {
 
 		/// All mutable container state. Accessed exclusively through `lock`.
-		private struct State {
+        private struct State: Sendable {
 			/// Cached dependency instances. Values are `any Sendable`, consistent with `Value: Sendable` on `@Dependency`.
 			var instances: [Key: any Sendable] = [:]
 			var overrides: [Key: Factory] = [:]
@@ -40,11 +40,7 @@ internal extension Dependencies {
 			var overrideVersion: UInt64 = 0
 		}
 
-		/// `uncheckedState` / `withLockUnchecked` are used throughout because `Key`
-		/// (`PartialKeyPath<Dependencies>`) inherits `@unchecked Sendable` from `AnyKeyPath`
-		/// but is not recognised as conditionally `Sendable` by the compiler, so `State`
-		/// cannot satisfy the `initialState:` / `withLock` requirement for a checked conformance.
-		private let lock = OSAllocatedUnfairLock(uncheckedState: State())
+		private let lock = OSAllocatedUnfairLock(initialState: State())
 
 
 		// MARK: - Resolve
@@ -59,7 +55,7 @@ internal extension Dependencies {
 		///
 		/// On `.raced`, the resolve recurses with a fresh snapshot. Depth is bounded by the count of overrides actually racing with this resolve (vanishingly small in practice).
 		internal func resolve<Dependency: Sendable>(_ keyPath: KeyPath<Dependencies, Dependency>) -> Dependency {
-			let key: Key = keyPath
+			let key = Key(keyPath)
 
 			if let cached: Dependency = cachedInstance(for: key) { return cached }
 
@@ -76,7 +72,7 @@ internal extension Dependencies {
 		// MARK: 1. cache
 
 		private func cachedInstance<Dependency: Sendable>(for key: Key) -> Dependency? {
-			lock.withLockUnchecked { $0.instances[key] as? Dependency }
+			lock.withLock { $0.instances[key] as? Dependency }
 		}
 
 
@@ -88,7 +84,7 @@ internal extension Dependencies {
         }
 
 		private func factorySnapshot(for key: Key) -> FactorySnapshot {
-			lock.withLockUnchecked {
+			lock.withLock {
 				FactorySnapshot(factory: $0.overrides[key], version: $0.overrideVersion)
 			}
 		}
@@ -129,7 +125,7 @@ internal extension Dependencies {
 			for key: Key,
 			expecting version: UInt64
 		) -> CommitResult<Dependency> {
-			lock.withLockUnchecked { state in
+			lock.withLock { state in
 				if let existing = state.instances[key] as? Dependency {
 					return .accepted(existing)
 				}
@@ -156,8 +152,8 @@ internal extension Dependencies {
 			with factory: @escaping Factory,
 			scope: OverrideScope
 		) {
-			let key: Key = keyPath
-			lock.withLockUnchecked { state in
+			let key = Key(keyPath)
+			lock.withLock { state in
 				switch scope {
 					case .all: state.instances = [:]
 					case .key: state.instances.removeValue(forKey: key)
@@ -173,11 +169,11 @@ internal extension Dependencies {
 		// MARK: - Reset
 
 		internal func resetResolutions() {
-			lock.withLockUnchecked { $0.instances = [:] }
+			lock.withLock { $0.instances = [:] }
 		}
 
 		internal func resetOverrides() {
-			lock.withLockUnchecked {
+			lock.withLock {
 				$0.overrides = [:]
 				// Clearing overrides is a mutation too — bump so in-flight resolves see it.
 				$0.overrideVersion &+= 1
@@ -186,14 +182,4 @@ internal extension Dependencies {
 
 	}
 
-}
-
-
-// MARK: - Key
-
-internal extension Dependencies.Container {
-	/// `PartialKeyPath<Dependencies>` keeps the root type but erases the value type, so
-	/// `KeyPath<Dependencies, _>` instances can serve as keys. KeyPath equality and hashing
-	/// are identity-based — no risk of `Int` hash collisions.
-	typealias Key = PartialKeyPath<Dependencies>
 }
