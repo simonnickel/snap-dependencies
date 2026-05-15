@@ -29,9 +29,10 @@ internal extension Dependencies {
 	/// time, a version mismatch means an override raced in and the freshly built value is discarded.
 	final class Container: Sendable {
 
-		/// State stored under the lock. Values may be non-`Sendable` user types, so the `uncheckedState` / `withLockUnchecked` variants of `OSAllocatedUnfairLock` are used. The lock itself guarantees mutual exclusion.
+		/// All mutable container state. Accessed exclusively through `lock`.
 		private struct State {
-			var instances: [Key: Any] = [:]
+			/// Cached dependency instances. Values are `any Sendable`, consistent with `Value: Sendable` on `@Dependency`.
+			var instances: [Key: any Sendable] = [:]
 			var overrides: [Key: Factory] = [:]
 			/// Bumped on every mutation of `overrides`. A `resolve` that snapshots this
 			/// value and finds it changed after building knows an override landed mid-build
@@ -39,6 +40,10 @@ internal extension Dependencies {
 			var overrideVersion: UInt64 = 0
 		}
 
+		/// `uncheckedState` / `withLockUnchecked` are used throughout because `Key`
+		/// (`PartialKeyPath<Dependencies>`) inherits `@unchecked Sendable` from `AnyKeyPath`
+		/// but is not recognised as conditionally `Sendable` by the compiler, so `State`
+		/// cannot satisfy the `initialState:` / `withLock` requirement for a checked conformance.
 		private let lock = OSAllocatedUnfairLock(uncheckedState: State())
 
 
@@ -53,7 +58,7 @@ internal extension Dependencies {
 		/// 4. **commit** — store the built value, or signal `.raced` to retry.
 		///
 		/// On `.raced`, the resolve recurses with a fresh snapshot. Depth is bounded by the count of overrides actually racing with this resolve (vanishingly small in practice).
-		internal func resolve<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>) -> Dependency {
+		internal func resolve<Dependency: Sendable>(_ keyPath: KeyPath<Dependencies, Dependency>) -> Dependency {
 			let key: Key = keyPath
 
 			if let cached: Dependency = cachedInstance(for: key) { return cached }
@@ -66,33 +71,33 @@ internal extension Dependencies {
 				case .raced: return resolve(keyPath) // override landed mid-build — re-resolve with the new snapshot.
 			}
 		}
-        
-        
+
+
 		// MARK: 1. cache
-        
-		private func cachedInstance<Dependency>(for key: Key) -> Dependency? {
+
+		private func cachedInstance<Dependency: Sendable>(for key: Key) -> Dependency? {
 			lock.withLockUnchecked { $0.instances[key] as? Dependency }
 		}
 
-        
+
         // MARK: 2. snapshot
-        
+
         private struct FactorySnapshot {
             let factory: Factory?
             let version: UInt64
         }
-        
+
 		private func factorySnapshot(for key: Key) -> FactorySnapshot {
 			lock.withLockUnchecked {
 				FactorySnapshot(factory: $0.overrides[key], version: $0.overrideVersion)
 			}
 		}
 
-        
+
 		// MARK: 3. build
 
 		/// Builds a dependency outside the lock so a factory that resolves another dependency does not deadlock on lock re-entry.
-		private func build<Dependency>(
+		private func build<Dependency: Sendable>(
 			keyPath: KeyPath<Dependencies, Dependency>,
 			snapshot: FactorySnapshot
 		) -> Dependency {
@@ -108,10 +113,10 @@ internal extension Dependencies {
 			return Dependencies.shared[keyPath: keyPath]
 		}
 
-        
+
         // MARK: 4. commit
-        
-        private enum CommitResult<Dependency> {
+
+        private enum CommitResult<Dependency: Sendable> {
             /// Either we cached our value, or another resolve had already cached one.
             case accepted(Dependency)
             /// An override landed during our build; the freshly built value is stale.
@@ -119,7 +124,7 @@ internal extension Dependencies {
         }
 
 		/// Caches `resolved` under `key`. Returns `.raced` if an override landed since the snapshot; the caller must re-resolve.
-		private func commit<Dependency>(
+		private func commit<Dependency: Sendable>(
 			_ resolved: Dependency,
 			for key: Key,
 			expecting version: UInt64

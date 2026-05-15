@@ -28,7 +28,7 @@ A small Dependency Injection container for Swift.
 * Resolve with `@Dependency`, with two resolution modes:
   * `.lazy` (default) — resolves on every read; observes overrides set after the owner is constructed.
   * `.captured` — resolves once at owner-init and stores the value; cheaper reads; cannot observe later overrides.
-* `Dependency<SendableType>` is `Sendable`; `Dependency<NonSendableType>` is not — the compiler catches unsafe cross-isolation usage automatically. Non-`Sendable` types are safe in actor-isolated owners (e.g. `@MainActor` class).
+* All dependency types must be `Sendable` — see Design notes for why.
 * Auto-detected `Context` (`.live`, `.preview`, `.test`) from `ProcessInfo` — branch on `Dependencies.context` to register different implementations per environment.
 * Override any dependency in `.preview` and `.test`. Overrides outside those contexts trap; an override factory returning the wrong type also traps.
 * Forwarding lets a package declare a `KeyPath` whose concrete value is provided by the consuming app.
@@ -140,7 +140,7 @@ extension Dependencies: @retroactive DependencyForwardingFactory {
 
 ## Design notes
 
-* **Thread safety**: all mutable container state is guarded by `OSAllocatedUnfairLock`. Non-`Sendable` dependency types are supported — synchronous lock-based resolution means no value crosses an isolation boundary during resolution. `@Dependency` uses conditional `Sendable`: `Dependency<Sendable>` is `Sendable` (compiler-verified); `Dependency<NonSendable>` is not, so the compiler catches any attempt to use it in a `Sendable` context.
+* **Thread safety**: all mutable container state is guarded by `OSAllocatedUnfairLock`. Dependency types must be `Sendable`. The container is a process-wide singleton that caches and shares instances: the same object is returned to every caller that resolves a given key path. A non-`Sendable` type resolved in two different isolation contexts — e.g. a `@MainActor` view and an actor service — would produce concurrent access to the same object, a data race the compiler cannot detect because the two resolutions appear independent. `Sendable` is therefore required on the type itself, where the thread-safety story is known. For types without built-in `Sendable`, use `@MainActor` (single-actor access), `actor` (concurrent access), or `@unchecked Sendable` with internal synchronisation.
 * **Build outside the lock**: a factory that itself resolves another dependency does not deadlock on lock re-entry. A double-check on insert ensures two threads racing on the same key converge on a single cached instance.
 * **Override-version race detection**: an override registered while a build is in flight bumps a version counter; the in-flight build detects the mismatch at commit and re-resolves, so a stale value is never cached after a concurrent override.
 * **Type-safe overrides**: an override factory returning the wrong type traps with a clear message rather than silently falling back to the default.
@@ -149,8 +149,9 @@ extension Dependencies: @retroactive DependencyForwardingFactory {
 ## ToDo
 * Make `reset()` public (or provide a public test-support target) to avoid requiring `@testable import`.
 * Scoped containers / child containers for per-feature or per-screen dependency lifetimes.
-* Async factory support — factories are currently synchronous (`() -> Any`).
+* Async factory support — factories are currently synchronous.
 * Compile-time registration validation (e.g. via macro or build plugin) to catch unregistered dependencies before runtime.
 * Cycle detection — trap with a clear message instead of infinite recursion when factories form a cycle.
 * Simplify forwarding — replace the `@retroactive` conformance pattern with a registration-based API.
 * Explore TaskLocal instead of overrides.
+* Allow multiple Container to support parallel testing.

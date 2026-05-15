@@ -5,12 +5,14 @@
 
 import Foundation
 
-class LongInitService {
-	
+// TODO: Should not be MainActor, example to not block main. Show in Demo.
+@MainActor
+final class LongInitService {
+
 	var counter: Int = 0
-	
+
 	init() {
 		sleep(3)
 	}
-	
+
 }

@@ -16,4 +16,11 @@ extension Dependencies {
 	
 	var serviceWithServiceInInit: ServiceWithServiceInInit { ServiceWithServiceInInit() }
 
+	var serviceMainActor: ServiceMainActor {
+		switch Dependencies.context {
+			case .test: ServiceMainActor(context: ".test")
+			default: ServiceMainActor(context: ".live")
+		}
+	}
+
 }

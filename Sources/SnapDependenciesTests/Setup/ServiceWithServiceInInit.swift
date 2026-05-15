@@ -5,17 +5,13 @@
 
 import SnapDependencies
 
-class ServiceWithServiceInInit {
+/// Test helper that resolves a dependency inside its own `init`, exercising the container's lock-free re-entry path.
+final class ServiceWithServiceInInit: Sendable {
 
-	var context: String = ""
-	
-	@Dependency(\.service) private var service: Service
-	
+	let context: String
+
 	init() {
-		updateContext()
-	}
-	
-	private func updateContext() {
+		@Dependency(\.service) var service: Service
 		self.context = service.context
 	}
 

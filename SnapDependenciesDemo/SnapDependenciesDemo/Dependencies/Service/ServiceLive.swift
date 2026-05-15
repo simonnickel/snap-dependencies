@@ -3,7 +3,8 @@
 //  Created by Simon Nickel
 //
 
-class ServiceLive: Service {
+@MainActor
+final class ServiceLive: Service {
 
 	private let context: String = ".live"
 
@@ -12,11 +13,11 @@ class ServiceLive: Service {
 	}
 
 	private var count: Int = 0
-	
+
 	func set(count: Int) {
 		self.count = count
 	}
-	
+
 	func getCount() -> Int {
 		count
 	}

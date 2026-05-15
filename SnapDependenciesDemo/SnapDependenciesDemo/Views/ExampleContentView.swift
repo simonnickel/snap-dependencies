@@ -49,7 +49,7 @@ struct ExampleContentView: View {
 
 // Use override definition.
 #Preview("Override") {
-	Dependencies.override(\.service) { ServicePreview(context: "#Preview") }
+	Dependencies.override(\.service, onMainActor: { ServicePreview(context: "#Preview") })
 
 	return ExampleContentView()
 }

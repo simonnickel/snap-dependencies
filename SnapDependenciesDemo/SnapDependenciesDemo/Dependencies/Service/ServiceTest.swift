@@ -3,7 +3,8 @@
 //  Created by Simon Nickel
 //
 
-class ServiceTest: Service {
+@MainActor
+final class ServiceTest: Service {
 
 	private let context: String
 	

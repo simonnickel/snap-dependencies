@@ -27,9 +27,11 @@ import SnapFoundation
 /// safe to share across threads.
 final public class Dependencies: Sendable {
 	
-	/// Closure used to construct a dependency instance. `@Sendable` constrains the closure, not the value it returns.
-    /// Dependency instances can be non-Sendable. Factories that capture non-Sendable shared state are rejected at compile time.
-	public typealias Factory = @Sendable () -> Any
+	/// Closure used to construct a dependency instance.
+    /// `@Sendable` constrains the closure itself, factories that capture non-`Sendable` shared state are rejected at compile time.
+    /// The return type is `any Sendable`, consistent with the `Value: Sendable` requirement on `@Dependency`;
+	/// the concrete type is recovered via `as?` in the build step.
+	public typealias Factory = @Sendable () -> any Sendable
 
 	/// **Thread Safety**: Swift ensures that static properties are lazily initialized only once.
 	internal static let shared: Dependencies = Dependencies()
@@ -62,11 +64,11 @@ final public class Dependencies: Sendable {
 	// MARK: - Resolve
 
 	/// Used by @Dependency property wrapper.
-	internal static func resolve<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>) -> Dependency {
+	internal static func resolve<Dependency: Sendable>(_ keyPath: KeyPath<Dependencies, Dependency>) -> Dependency {
 		return Dependencies.shared.resolve(keyPath)
 	}
 
-	private func resolve<Dependency>(_ keyPath: KeyPath<Dependencies, Dependency>) -> Dependency {
+	private func resolve<Dependency: Sendable>(_ keyPath: KeyPath<Dependencies, Dependency>) -> Dependency {
 		Logger.dependencies.debug("Resolving: `\(keyPath.debugDescription)`")
 
 		let resolved = container.resolve(keyPath)
@@ -114,6 +116,31 @@ final public class Dependencies: Sendable {
 		with factory: @escaping Factory
 	) {
 		Dependencies.shared.override(keyPath, with: factory, scope: .all)
+	}
+
+	/// Variant of `override(_:with:)` for `@MainActor`-isolated dependency types.
+	///
+	/// `@MainActor` classes synthesise `Sendable` and are valid dependency values, but their
+	/// initialisers are `@MainActor` and cannot be called from a plain `@Sendable` factory.
+	/// This variant accepts a `@MainActor` factory and wraps it with `MainActor.assumeIsolated`
+	/// — safe because overrides in `#Preview` and `@MainActor` test methods always execute on
+	/// the main actor.
+	public static func override<Dependency>(
+		_ keyPath: KeyPath<Dependencies, Dependency>,
+		onMainActor factory: @escaping @MainActor () -> any Sendable
+	) {
+		Dependencies.shared.override(keyPath, with: { @Sendable in MainActor.assumeIsolated { factory() } }, scope: .key)
+	}
+
+	/// Variant of `overrideResettingAll(_:with:)` for `@MainActor`-isolated dependency types.
+	///
+	/// See `override(_:onMainActor:)` for the `@MainActor` factory variant and
+	/// `overrideResettingAll(_:with:)` for the cache-invalidation semantics.
+	public static func overrideResettingAll<Dependency>(
+		_ keyPath: KeyPath<Dependencies, Dependency>,
+		onMainActor factory: @escaping @MainActor () -> any Sendable
+	) {
+		Dependencies.shared.override(keyPath, with: { @Sendable in MainActor.assumeIsolated { factory() } }, scope: .all)
 	}
 
 	private func override<Dependency>(

@@ -7,6 +7,7 @@ import SnapDependencies
 
 extension Dependencies {
 	
+    @MainActor
 	var service: Service {
 		switch Dependencies.context {
 			case .preview: ServicePreview(context: ".preview")
@@ -14,11 +15,13 @@ extension Dependencies {
 			default: ServiceLive()
 		}
 	}
+
 	var someActor: SomeActor { SomeActor() }
     
     @MainActor
 	var dataSource: DataSource { DataSource() }
     
+    @MainActor
 	var longInitService: LongInitService { LongInitService() }
 
 }

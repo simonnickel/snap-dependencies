@@ -3,8 +3,8 @@
 //  Created by Simon Nickel
 //
 
-/// SnapDependencies supports non-Sendable dependency types.
-protocol Service {
+@MainActor
+protocol Service: Sendable {
 
 	func getCount() -> Int
 	func set(count: Int)

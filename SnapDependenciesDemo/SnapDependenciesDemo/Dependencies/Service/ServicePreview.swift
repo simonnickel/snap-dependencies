@@ -3,7 +3,8 @@
 //  Created by Simon Nickel
 //
 
-class ServicePreview: Service {
+@MainActor
+final class ServicePreview: Service {
 
 	private let context: String
 	

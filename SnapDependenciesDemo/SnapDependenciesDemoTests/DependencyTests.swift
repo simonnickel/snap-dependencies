@@ -37,7 +37,7 @@ struct DependencyTests {
 	}
 
 	@Test func serviceFromOverride() async throws {
-		Dependencies.override(\.service) { ServiceTest(context: "Test") }
+		Dependencies.override(\.service, onMainActor: { ServiceTest(context: "Test") })
 		
 		@Dependency(\.service) var service: Service
 

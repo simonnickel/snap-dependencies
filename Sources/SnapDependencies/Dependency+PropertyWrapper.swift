@@ -19,23 +19,30 @@
 /// - `.captured`: the dependency is resolved once inside `init` and stored. Cheaper
 ///   hot-path reads; overrides set after the owner is constructed are not observed.
 ///
-/// **`Sendable`**
+/// **Why `Value: Sendable` is required**
 ///
-/// `Dependency` uses a conditional `Sendable` conformance:
+/// The container is a process-wide singleton that caches and shares instances. Resolving
+/// the same key path from two different isolation contexts — e.g. a `@MainActor` view and
+/// an actor service — yields the same cached object. If that object were non-`Sendable`,
+/// both contexts would access it concurrently, producing a data race that the compiler
+/// cannot detect: the two resolutions appear independent, so no isolation crossing is
+/// visible to the type checker. Requiring `Value: Sendable` ensures every shared dependency
+/// carries an explicit, auditable concurrency declaration on the type itself — the only
+/// place where the thread-safety story is actually known.
 ///
-/// - `Dependency<SendableValue>` is `Sendable`. `@unchecked` is applied only in this scope
-///   to accommodate `KeyPath`, which inherits `@unchecked Sendable` from `AnyKeyPath` and
-///   cannot be verified as conditionally `Sendable` by the compiler. The `capturedValue: Value?`
-///   field is genuinely `Sendable` in this scope.
-/// - `Dependency<NonSendableValue>` has no `Sendable` conformance. The compiler will flag any
-///   attempt to use it in a `Sendable` context — the correct behaviour.
+/// For types without built-in `Sendable`, the appropriate fix depends on the access pattern:
+/// - Accessed from a single actor (e.g. always `@MainActor`): annotate the type `@MainActor`.
+/// - Needs concurrent access from multiple actors: make it an `actor`.
+/// - Has internal synchronisation (lock, dispatch queue): add `@unchecked Sendable` to
+///   the type with a comment explaining the guarantee.
 ///
-/// Non-`Sendable` dependencies are still supported. In actor-isolated owners (e.g. a
-/// `@MainActor` class or an actor), stored properties are not required to be `Sendable` —
-/// the isolation itself provides the safety guarantee. Resolution goes through `Container`'s
-/// `OSAllocatedUnfairLock`, which handles concurrent creation for all `Value` types regardless
-/// of `Sendable`.
-@propertyWrapper public struct Dependency<Value> {
+/// **`@unchecked Sendable`**
+///
+/// `Value: Sendable` ensures `capturedValue: Value?` is genuinely `Sendable`. The `@unchecked`
+/// annotation covers only `keyPath: KeyPath<Dependencies, Value>`, which inherits
+/// `@unchecked Sendable` from `AnyKeyPath` — a `KeyPath` is pure accessor metadata and
+/// carries no value across isolation boundaries.
+@propertyWrapper public struct Dependency<Value: Sendable>: @unchecked Sendable {
 
 	/// Controls when the dependency is resolved.
 	public enum Resolution {
@@ -58,8 +65,3 @@
 	}
 
 }
-
-/// `@unchecked` is scoped to `Value: Sendable` — `Dependency<NonSendableValue>` has no
-/// conformance and the compiler catches misuse. The `@unchecked` covers only `KeyPath`,
-/// which inherits unconditional `@unchecked Sendable` from `AnyKeyPath`.
-extension Dependency: @unchecked Sendable where Value: Sendable {}
