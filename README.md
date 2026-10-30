@@ -36,9 +36,9 @@ A small Dependency Injection container for Swift.
 
 ## Limitations
 
-* One instance per `KeyPath` for the lifetime of the container; no per-resolution lifetimes.
+* One instance per `KeyPath` for the lifetime of the container; no per-resolution lifetimes. See [TODO-2](docs/todo/todos.md).
 * Dependencies are immutable in `.live`; replacement is only available via overrides in `.preview` and `.test`.
-* The container is a process-wide singleton. Tests share state, so call `Dependencies.reset()` between tests (currently `internal` — consumers need `@testable import`).
+* The container is a process-wide singleton. Tests share state, so call `Dependencies.reset()` between tests (currently `internal` — consumers need `@testable import`). See [TODO-1 and TODO-8](docs/todo/todos.md).
 
 
 ## Demo project
@@ -144,14 +144,3 @@ extension Dependencies: @retroactive DependencyForwardingFactory {
 * **Build outside the lock**: a factory that itself resolves another dependency does not deadlock on lock re-entry. A double-check on insert ensures two threads racing on the same key converge on a single cached instance.
 * **Override-version race detection**: an override registered while a build is in flight bumps a version counter; the in-flight build detects the mismatch at commit and re-resolves, so a stale value is never cached after a concurrent override.
 * **Type-safe overrides**: an override factory returning the wrong type traps with a clear message rather than silently falling back to the default.
-
-
-## ToDo
-* Make `reset()` public (or provide a public test-support target) to avoid requiring `@testable import`.
-* Scoped containers / child containers for per-feature or per-screen dependency lifetimes.
-* Async factory support — factories are currently synchronous.
-* Compile-time registration validation (e.g. via macro or build plugin) to catch unregistered dependencies before runtime.
-* Cycle detection — trap with a clear message instead of infinite recursion when factories form a cycle.
-* Simplify forwarding — replace the `@retroactive` conformance pattern with a registration-based API.
-* Explore TaskLocal instead of overrides.
-* Allow multiple Container to support parallel testing.
