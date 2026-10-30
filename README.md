@@ -17,9 +17,9 @@ A small Dependency Injection container for Swift.
 
 ## Requirements
 
-- iOS 18+ / macOS 15+
-- Swift 6.3+ (swift-tools-version 6.3)
-- Depends on [`snap-foundation`](https://github.com/simonnickel/snap-foundation)
+- iOS 18+, macOS 15+
+- Swift 6.3
+- Dependencies: [snap-foundation](https://github.com/simonnickel/snap-foundation)
 
 
 ## Features
